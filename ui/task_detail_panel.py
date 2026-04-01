@@ -63,6 +63,7 @@ def _doc_icon(filename: str) -> str:
 class _DocRow(QWidget):
     """单条文档链接/本地文件行"""
     delete_requested = pyqtSignal(int)
+    fetch_content_requested = pyqtSignal(str)  # url
 
     def __init__(self, note, parent=None):
         super().__init__(parent)
@@ -119,7 +120,26 @@ class _DocRow(QWidget):
         """)
         open_btn.clicked.connect(self._open)
 
-        # 删除按钮
+        row.addWidget(icon)
+        row.addLayout(info_col, 1)
+
+        # 「读取内容」按钮：仅对企微/飞书等支持的链接显示
+        if self._note.is_link:
+            url = self._note.content or ""
+            if any(h in url for h in ["weixin.qq.com", "feishu.cn", "larksuite.com", "notion.so", "kdocs.cn"]):
+                fetch_btn = QPushButton("📥 读取")
+                fetch_btn.setFixedSize(QSize(60, 24))
+                fetch_btn.setToolTip("读取文档内容，可供 AI 分析")
+                fetch_btn.setStyleSheet("""
+                    QPushButton { background: rgba(60,200,100,0.15); color: #3DDB6B;
+                        border: none; border-radius: 5px; font-size: 10px; }
+                    QPushButton:hover { background: rgba(60,200,100,0.3); }
+                """)
+                fetch_btn.clicked.connect(lambda: self.fetch_content_requested.emit(self._note.content or ""))
+                row.addWidget(fetch_btn)
+
+        row.addWidget(open_btn)
+
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(20, 20)
         del_btn.setStyleSheet("""
@@ -127,10 +147,6 @@ class _DocRow(QWidget):
             QPushButton:hover { color: #FF6B6B; }
         """)
         del_btn.clicked.connect(lambda: self.delete_requested.emit(self._note.id))
-
-        row.addWidget(icon)
-        row.addLayout(info_col, 1)
-        row.addWidget(open_btn)
         row.addWidget(del_btn)
 
     def _link_icon(self, url: str) -> str:
@@ -793,8 +809,40 @@ class TaskDetailPanel(QDialog):
     def _add_doc_row(self, note: TaskNote) -> None:
         row = _DocRow(note, self._doc_container)
         row.delete_requested.connect(self._delete_note)
+        row.fetch_content_requested.connect(self._fetch_doc_content)
         count = self._doc_list_layout.count()
         self._doc_list_layout.insertWidget(count - 1, row)
+
+    def _fetch_doc_content(self, url: str) -> None:
+        """读取文档内容并追加到文字结论区"""
+        from services.wxwork_doc_service import WxWorkDocService
+        # 获取 settings（通过 task_repo 间接获取，或直接导入）
+        try:
+            from data.settings_repository import SettingsRepository
+            settings = SettingsRepository()
+        except Exception:
+            settings = None
+
+        service = WxWorkDocService(settings)
+        if not service.has_cookie():
+            self._show_link_hint("请先在「设置 → 企业微信文档」中配置 Cookie", success=False)
+            return
+
+        self._show_link_hint("正在读取文档内容...", success=True)
+        QTimer.singleShot(100, lambda: self._do_fetch(service, url))
+
+    def _do_fetch(self, service, url: str) -> None:
+        info = service.fetch_doc(url)
+        if info.success:
+            # 把文档内容追加到文字结论里
+            existing = self._text_edit.toPlainText().strip()
+            separator = f"\n\n--- 文档内容（{info.title or url}）---\n"
+            self._text_edit.setPlainText(
+                (existing + separator + info.content) if existing else (separator.strip() + "\n" + info.content)
+            )
+            self._show_link_hint(f"已读取：{info.title or '文档'}", success=True)
+        else:
+            self._show_link_hint(info.error or "读取失败", success=False)
 
     def _show_link_hint(self, msg: str, success: bool = False) -> None:
         color = "#3DDB6B" if success else "#FF6B6B"

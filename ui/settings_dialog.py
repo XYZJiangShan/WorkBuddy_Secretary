@@ -183,6 +183,57 @@ class SettingsDialog(QDialog):
         self._hotkey_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._hotkey_enabled_check)
 
+        # ---- 6. 企业微信文档 Cookie ----
+        content_layout.addWidget(self._section_label("🔗 企业微信文档访问"))
+
+        cookie_hint = QLabel(
+            "粘贴 Cookie 后可在任务详情中读取企微文档内容供 AI 分析。\n"
+            "获取方式：Chrome 打开企微文档 → F12 → Network → 任意请求 → Request Headers → cookie 行"
+        )
+        cookie_hint.setStyleSheet("color: #6B6880; font-size: 10px;")
+        cookie_hint.setWordWrap(True)
+        content_layout.addWidget(cookie_hint)
+
+        self._wxwork_cookie_edit = QLineEdit()
+        self._wxwork_cookie_edit.setPlaceholderText("粘贴企业微信文档 Cookie（如：pac_uid=xxx; skey=xxx; ...）")
+        self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)  # 隐藏敏感内容
+        self._wxwork_cookie_edit.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #C0BDDE; border-radius: 6px;
+                padding: 6px 10px; font-size: 10px; color: #2D2B3D;
+                background: rgba(255,255,255,0.6);
+            }
+            QLineEdit:focus { border-color: #6C63FF; }
+        """)
+        content_layout.addWidget(self._wxwork_cookie_edit)
+
+        cookie_status_row = QHBoxLayout()
+        self._wxwork_cookie_status = QLabel("未配置")
+        self._wxwork_cookie_status.setStyleSheet("color: #A09DB8; font-size: 10px;")
+        show_cookie_btn = QPushButton("显示/隐藏")
+        show_cookie_btn.setFixedHeight(24)
+        show_cookie_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        show_cookie_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: 1px solid #C0BDDE;
+                border-radius: 4px; color: #6B6880; font-size: 10px; padding: 0 8px; }
+            QPushButton:hover { background: #F0EEF8; }
+        """)
+        show_cookie_btn.clicked.connect(self._toggle_cookie_visibility)
+        clear_cookie_btn = QPushButton("清除")
+        clear_cookie_btn.setFixedHeight(24)
+        clear_cookie_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        clear_cookie_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: 1px solid #C0BDDE;
+                border-radius: 4px; color: #FF6B6B; font-size: 10px; padding: 0 8px; }
+            QPushButton:hover { background: rgba(255,107,107,0.08); }
+        """)
+        clear_cookie_btn.clicked.connect(lambda: self._wxwork_cookie_edit.clear())
+        cookie_status_row.addWidget(self._wxwork_cookie_status)
+        cookie_status_row.addStretch()
+        cookie_status_row.addWidget(show_cookie_btn)
+        cookie_status_row.addWidget(clear_cookie_btn)
+        content_layout.addLayout(cookie_status_row)
+
         content_layout.addStretch()
         scroll.setWidget(scroll_widget)
         card_layout.addWidget(scroll, 1)
@@ -333,6 +384,21 @@ class SettingsDialog(QDialog):
         self._short_break_slider.setValue(self._settings.get_int("pomodoro_short_break_minutes", 5))
         self._long_break_slider.setValue(self._settings.get_int("pomodoro_long_break_minutes", 15))
         self._hotkey_enabled_check.setChecked(self._settings.get_bool("hotkey_enabled", True))
+        # 企微 Cookie
+        cookie = self._settings.get("wxwork_cookie", "")
+        self._wxwork_cookie_edit.setText(cookie)
+        if cookie:
+            self._wxwork_cookie_status.setText(f"已配置（{len(cookie)} 字符）")
+            self._wxwork_cookie_status.setStyleSheet("color: #52C41A; font-size: 10px;")
+        else:
+            self._wxwork_cookie_status.setText("未配置")
+            self._wxwork_cookie_status.setStyleSheet("color: #A09DB8; font-size: 10px;")
+
+    def _toggle_cookie_visibility(self) -> None:
+        if self._wxwork_cookie_edit.echoMode() == QLineEdit.EchoMode.Password:
+            self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
     def _on_save(self) -> None:
         self._settings.set_many({
@@ -348,6 +414,7 @@ class SettingsDialog(QDialog):
             "pomodoro_short_break_minutes": str(self._short_break_slider.value()),
             "pomodoro_long_break_minutes": str(self._long_break_slider.value()),
             "hotkey_enabled": "1" if self._hotkey_enabled_check.isChecked() else "0",
+            "wxwork_cookie": self._wxwork_cookie_edit.text().strip(),
         })
         self.settings_saved.emit()
         self.close()
