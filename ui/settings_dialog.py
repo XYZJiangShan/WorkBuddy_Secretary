@@ -482,6 +482,7 @@ class SettingsDialog(QDialog):
                     [
                         exe,
                         f"--remote-debugging-port={WxWorkDocService._CDP_PORT}",
+                        "--remote-allow-origins=*",
                         f"--user-data-dir={debug_profile}",
                         "--no-first-run",
                         "--no-default-browser-check",

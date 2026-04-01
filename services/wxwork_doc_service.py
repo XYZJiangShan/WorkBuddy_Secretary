@@ -235,6 +235,7 @@ class WxWorkDocService:
                 [
                     exe,
                     f"--remote-debugging-port={self._CDP_PORT}",
+                    "--remote-allow-origins=*",
                     f"--user-data-dir={debug_profile}",
                     "--no-first-run",
                     "--no-default-browser-check",
