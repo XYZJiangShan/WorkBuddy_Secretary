@@ -13,7 +13,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel,
+    QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QSlider, QVBoxLayout, QWidget,
     QScrollArea,
 )
@@ -117,8 +117,48 @@ class SettingsDialog(QDialog):
         ai_group_layout.addWidget(self._field_row("API Key", self._api_key_input))
         self._base_url_input = self._make_line_edit("https://api.deepseek.com/v1")
         ai_group_layout.addWidget(self._field_row("Base URL", self._base_url_input))
-        self._model_input = self._make_line_edit("deepseek-chat")
-        ai_group_layout.addWidget(self._field_row("模型名称", self._model_input))
+
+        # 模型下拉选择
+        self._model_combo = QComboBox()
+        self._model_combo.setEditable(True)  # 允许手动输入自定义模型
+        self._model_combo.addItems([
+            "deepseek-v3.2",
+            "gpt-5.4",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "openai/xai.grok-4",
+            "vertex_ai/gemini-3.1-pro-preview",
+            "vertex_ai/gemini-3.1-flash-image-preview",
+            "deepseek-chat",
+        ])
+        self._model_combo.setStyleSheet("""
+            QComboBox {
+                background: rgba(40,36,62,0.8);
+                border: 1px solid rgba(139,133,255,0.2);
+                border-radius: 6px; padding: 4px 8px;
+                color: #E8E5FF; font-size: 11px;
+            }
+            QComboBox:focus { border: 1px solid #8B85FF; }
+            QComboBox::drop-down {
+                border: none; width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #8B85FF;
+                margin-right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                background: #1E1B30;
+                color: #E8E5FF;
+                border: 1px solid rgba(139,133,255,0.3);
+                selection-background-color: rgba(139,133,255,0.3);
+                outline: none;
+            }
+        """)
+        self._model_combo.setFont(QFont("Microsoft YaHei", 10))
+        ai_group_layout.addWidget(self._field_row("模型名称", self._model_combo))
 
         content_layout.addWidget(self._ai_config_group)
 
@@ -467,7 +507,7 @@ class SettingsDialog(QDialog):
         self._ai_config_group.setEnabled(ai_enabled)
         self._api_key_input.setText(self._settings.get("ai_api_key", ""))
         self._base_url_input.setText(self._settings.get("ai_base_url", "https://api.deepseek.com/v1"))
-        self._model_input.setText(self._settings.get("ai_model", "deepseek-chat"))
+        self._model_combo.setCurrentText(self._settings.get("ai_model", "deepseek-v3.2"))
         self._enabled_check.setChecked(self._settings.get_bool("reminder_enabled", True))
         self._interval_slider.setValue(self._settings.get_int("reminder_interval_minutes", 45))
         self._dark_mode_check.setChecked(self._settings.get("theme", "light") == "dark")
@@ -613,7 +653,7 @@ class SettingsDialog(QDialog):
             "ai_enabled": "1" if self._ai_enabled_check.isChecked() else "0",
             "ai_api_key": self._api_key_input.text().strip(),
             "ai_base_url": self._base_url_input.text().strip(),
-            "ai_model": self._model_input.text().strip(),
+            "ai_model": self._model_combo.currentText().strip(),
             "reminder_enabled": "1" if self._enabled_check.isChecked() else "0",
             "reminder_interval_minutes": str(self._interval_slider.value()),
             "theme": "dark" if self._dark_mode_check.isChecked() else "light",
