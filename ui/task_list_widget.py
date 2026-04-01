@@ -30,7 +30,7 @@ from data.task_repository import Task
 
 class PriorityLed(QWidget):
     """
-    仿灯泡效果的优先级指示器。
+    精致玻璃球风格的优先级指示器。
     - 红色（high）= 高优先级
     - 绿色（low/medium）= 普通
     点击时在红/绿之间切换。
@@ -38,18 +38,18 @@ class PriorityLed(QWidget):
 
     clicked = pyqtSignal()
 
-    # 颜色方案：(主色, 高光色, 外晕色)
+    # 颜色方案：(主色, 高光色, 外晕色, 暗边色)
     _COLORS = {
-        "high":   (QColor("#FF3B3B"), QColor("#FF9090"), QColor(255, 50, 50, 80)),
-        "medium": (QColor("#3DDB6B"), QColor("#A0F0B8"), QColor(60, 220, 100, 80)),
-        "low":    (QColor("#3DDB6B"), QColor("#A0F0B8"), QColor(60, 220, 100, 80)),
+        "high":   (QColor("#FF4444"), QColor("#FF9999"), QColor(255, 60, 60, 50),  QColor("#AA0000")),
+        "medium": (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A")),
+        "low":    (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A")),
     }
 
     def __init__(self, priority: str = "medium", parent=None):
         super().__init__(parent)
         self._priority = priority
         self._hovered = False
-        self.setFixedSize(QSize(18, 18))
+        self.setFixedSize(QSize(16, 16))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip("点击切换优先级（红=高 / 绿=普通）")
         self.setMouseTracking(True)
@@ -76,38 +76,65 @@ class PriorityLed(QWidget):
 
         w, h = self.width(), self.height()
         cx, cy = w / 2, h / 2
-        # hover 时稍微放大
-        r = (w * 0.42) * (1.15 if self._hovered else 1.0)
+        r = 5.0 * (1.12 if self._hovered else 1.0)
 
-        main_c, highlight_c, glow_c = self._COLORS.get(
+        main_c, highlight_c, glow_c, dark_c = self._COLORS.get(
             self._priority, self._COLORS["medium"]
         )
+        p.setPen(Qt.PenStyle.NoPen)
 
-        # ---- 外发光晕 ----
-        glow = QRadialGradient(QPointF(cx, cy), r * 1.9)
+        # ---- 1. 柔和外发光 ----
+        glow = QRadialGradient(QPointF(cx, cy), r * 2.5)
         glow.setColorAt(0.0, glow_c)
+        glow_mid = QColor(glow_c)
+        glow_mid.setAlpha(20)
+        glow.setColorAt(0.5, glow_mid)
         glow_edge = QColor(glow_c)
         glow_edge.setAlpha(0)
         glow.setColorAt(1.0, glow_edge)
-        p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(glow))
-        p.drawEllipse(QRectF(cx - r * 1.9, cy - r * 1.9, r * 3.8, r * 3.8))
+        p.drawEllipse(QRectF(cx - r * 2.5, cy - r * 2.5, r * 5, r * 5))
 
-        # ---- 主球体（径向渐变，稍偏左上让光源感更强）----
-        body = QRadialGradient(QPointF(cx - r * 0.2, cy - r * 0.3), r * 1.1)
+        # ---- 2. 底部投影（微妙阴影感）----
+        shadow = QRadialGradient(QPointF(cx, cy + r * 0.4), r * 1.1)
+        shadow.setColorAt(0.0, QColor(0, 0, 0, 30))
+        shadow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setBrush(QBrush(shadow))
+        p.drawEllipse(QRectF(cx - r * 1.1, cy - r * 0.7, r * 2.2, r * 2.2))
+
+        # ---- 3. 主球体（三层渐变：高光→主色→暗边）----
+        body = QRadialGradient(QPointF(cx - r * 0.25, cy - r * 0.3), r * 1.2)
         body.setColorAt(0.0, highlight_c)
-        body.setColorAt(0.5, main_c)
-        dark_c = main_c.darker(170)
+        body.setColorAt(0.35, main_c)
+        body.setColorAt(0.85, main_c.darker(130))
         body.setColorAt(1.0, dark_c)
         p.setBrush(QBrush(body))
         p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
 
-        # ---- 高光小斑（左上角白色椭圆，模拟反光）----
-        hi = QRadialGradient(QPointF(cx - r * 0.32, cy - r * 0.35), r * 0.45)
-        hi.setColorAt(0.0, QColor(255, 255, 255, 200))
+        # ---- 4. 边缘环光（半透明描边增强立体感）----
+        ring = QRadialGradient(QPointF(cx, cy), r)
+        ring_c = QColor(255, 255, 255, 0)
+        ring.setColorAt(0.0, ring_c)
+        ring.setColorAt(0.75, ring_c)
+        ring.setColorAt(0.92, QColor(255, 255, 255, 25))
+        ring.setColorAt(1.0, QColor(255, 255, 255, 8))
+        p.setBrush(QBrush(ring))
+        p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+
+        # ---- 5. 主高光（左上白色弧形，模拟窗口反射）----
+        hi = QRadialGradient(QPointF(cx - r * 0.3, cy - r * 0.35), r * 0.55)
+        hi.setColorAt(0.0, QColor(255, 255, 255, 210))
+        hi.setColorAt(0.5, QColor(255, 255, 255, 80))
         hi.setColorAt(1.0, QColor(255, 255, 255, 0))
         p.setBrush(QBrush(hi))
-        p.drawEllipse(QRectF(cx - r * 0.75, cy - r * 0.75, r * 0.9, r * 0.65))
+        p.drawEllipse(QRectF(cx - r * 0.78, cy - r * 0.8, r * 1.0, r * 0.7))
+
+        # ---- 6. 小光点（增强玻璃质感）----
+        dot = QRadialGradient(QPointF(cx - r * 0.15, cy - r * 0.2), r * 0.18)
+        dot.setColorAt(0.0, QColor(255, 255, 255, 255))
+        dot.setColorAt(1.0, QColor(255, 255, 255, 0))
+        p.setBrush(QBrush(dot))
+        p.drawEllipse(QRectF(cx - r * 0.32, cy - r * 0.38, r * 0.35, r * 0.35))
 
         p.end()
 
