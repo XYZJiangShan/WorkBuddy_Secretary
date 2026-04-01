@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 虚拟环境
+venv/
+env/
+.venv/
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
+
+# 数据库（用户数据，不入库）
+*.db
+*.sqlite
+*.sqlite3
+
+# 调试脚本和日志
+debug_*.py
+debug_*.txt
+debug_*.txt.fault
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 附件目录（用户数据）
+attachments/

@@ -1,0 +1,258 @@
+20:13:47 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+20:13:47 [INFO] services.reminder_service: ReminderService 已启动，间隔 45 分钟
+20:13:47 [INFO] main: 桌面小秘书已启动
+20:13:47 [INFO] services.ai_service: generate_reminder_texts: API Key 未配置，使用本地文案
+20:13:47 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+20:13:47 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 5 条
+20:13:47 [CRITICAL] root: 未捕获的异常:
+Traceback (most recent call last):
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 106, in <lambda>
+    QTimer.singleShot(500, lambda: _open_settings(
+                                   ^^^^^^^^^^^^^^^
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 126, in _open_settings
+    dialog = SettingsDialog(settings, parent=parent)
+             ^^^^^^^^^^^^^^
+NameError: name 'SettingsDialog' is not defined
+
+
+[CRASH] Traceback (most recent call last):
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 106, in <lambda>
+    QTimer.singleShot(500, lambda: _open_settings(
+                                   ^^^^^^^^^^^^^^^
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 126, in _open_settings
+    dialog = SettingsDialog(settings, parent=parent)
+             ^^^^^^^^^^^^^^
+NameError: name 'SettingsDialog' is not defined
+
+20:15:15 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+20:15:15 [INFO] services.reminder_service: ReminderService 已启动，间隔 45 分钟
+20:15:15 [INFO] main: 桌面小秘书已启动
+20:15:15 [INFO] services.ai_service: generate_reminder_texts: API Key 未配置，使用本地文案
+20:15:15 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+20:15:15 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 5 条
+20:15:16 [CRITICAL] root: 未捕获的异常:
+Traceback (most recent call last):
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 106, in <lambda>
+    QTimer.singleShot(500, lambda: _open_settings(
+                                   ^^^^^^^^^^^^^^^
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 126, in _open_settings
+    dialog = SettingsDialog(settings, parent=parent)
+             ^^^^^^^^^^^^^^
+NameError: name 'SettingsDialog' is not defined
+
+
+[CRASH] Traceback (most recent call last):
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 106, in <lambda>
+    QTimer.singleShot(500, lambda: _open_settings(
+                                   ^^^^^^^^^^^^^^^
+  File "c:\Users\Lenovo\WorkBuddy\20260330193344\desk-secretary\main.py", line 126, in _open_settings
+    dialog = SettingsDialog(settings, parent=parent)
+             ^^^^^^^^^^^^^^
+NameError: name 'SettingsDialog' is not defined
+
+20:16:11 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+20:16:11 [INFO] services.reminder_service: ReminderService 已启动，间隔 45 分钟
+20:16:11 [INFO] main: 桌面小秘书已启动
+20:16:11 [INFO] services.ai_service: generate_reminder_texts: API Key 未配置，使用本地文案
+20:16:11 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+20:16:11 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 5 条
+20:16:19 [INFO] services.reminder_service: ReminderService 配置已重载
+20:16:19 [INFO] main: 设置已保存并生效
+20:17:06 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-2313059d-bba0-4150-a89c-663fc8aa390e', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个任务解析助手。请将用户输入的自然语言任务描述解析为结构化 JSON。\n\n当前时间：2026-03-30 20:17\n\n规则：\n- title: 简洁的任务名称（不超过30字）\n- priority: 优先级，只能是 "high"（高/重要/紧急）、"medium"（中/普通）、"low"（低/随意）\n- due_time: 截止时间，格式为 "YYYY-MM-DD HH:MM"，无法确定时为 null\n- 如果用户说"明天"，基于今天日期推算；说"下周"推算到下周一\n\n只返回 JSON，不要解释，格式如下：\n{"title": "...", "priority": "medium", "due_time": "2026-03-31 15:00"}\n\n用户输入：曹操和关羽谁更厉害'}], 'model': 'deepseek-chat', 'max_tokens': 200, 'temperature': 0.1}}
+20:17:07 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+20:17:07 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+20:17:07 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x0000023191D4B7A0>
+20:17:07 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319AE85BD0> server_hostname='api.deepseek.com' timeout=10.0
+20:17:07 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319ADC6ED0>
+20:17:07 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+20:17:07 [DEBUG] httpcore.http11: send_request_headers.complete
+20:17:07 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+20:17:07 [DEBUG] httpcore.http11: send_request_body.complete
+20:17:07 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+20:17:07 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'8184065948a6c89165f86b407049f31b'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Mon, 30 Mar 2026 12:17:07 GMT'), (b'EO-LOG-UUID', b'2403304824450781217'), (b'EO-Cache-Status', b'MISS')])
+20:17:07 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+20:17:07 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+20:17:08 [DEBUG] httpcore.http11: receive_response_body.complete
+20:17:08 [DEBUG] httpcore.http11: response_closed.started
+20:17:08 [DEBUG] httpcore.http11: response_closed.complete
+20:17:08 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '8184065948a6c89165f86b407049f31b', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Mon, 30 Mar 2026 12:17:07 GMT', 'eo-log-uuid': '2403304824450781217', 'eo-cache-status': 'MISS'})
+20:17:08 [DEBUG] openai._base_client: request_id: None
+20:17:08 [DEBUG] services.ai_worker: AIWorker 完成: task_type=parse_task
+20:17:30 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-66d0bcd4-9d2c-44a7-8af5-c9642c35fc80', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一位温暖又专业的工作复盘助手。请根据以下今日任务数据，生成一份简洁有价值的复盘报告。\n\n今日日期：2026年03月30日\n已完成（0 项）：\n（今日暂无已完成任务）\n\n未完成（1 项）：\n- [low] 比较曹操和关羽的历史评价\n\n报告要求：\n1. 先简短肯定今日成果（1~2句）\n2. 分析未完成任务的可能原因（若有，1~3条建议）\n3. 给出明日优先事项提示（2~3条）\n4. 结尾用一句温暖的话鼓励\n\n格式：使用 Markdown（## 标题，- 列表），控制在 200 字以内，语气真诚不浮夸。'}], 'model': 'deepseek-chat', 'max_tokens': 600, 'temperature': 0.7}}
+20:17:30 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+20:17:30 [DEBUG] httpcore.connection: close.started
+20:17:30 [DEBUG] httpcore.connection: close.complete
+20:17:30 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+20:17:30 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B320A70>
+20:17:30 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319AE85BD0> server_hostname='api.deepseek.com' timeout=10.0
+20:17:30 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B3207D0>
+20:17:30 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+20:17:30 [DEBUG] httpcore.http11: send_request_headers.complete
+20:17:30 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+20:17:30 [DEBUG] httpcore.http11: send_request_body.complete
+20:17:30 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+20:17:30 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'8d22a5c30810a479b7e1d4e4a5d6cee0'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Mon, 30 Mar 2026 12:17:30 GMT'), (b'EO-LOG-UUID', b'279322953137564268'), (b'EO-Cache-Status', b'MISS')])
+20:17:30 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+20:17:30 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+20:17:36 [DEBUG] httpcore.http11: receive_response_body.complete
+20:17:37 [DEBUG] httpcore.http11: response_closed.started
+20:17:37 [DEBUG] httpcore.http11: response_closed.complete
+20:17:37 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '8d22a5c30810a479b7e1d4e4a5d6cee0', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Mon, 30 Mar 2026 12:17:30 GMT', 'eo-log-uuid': '279322953137564268', 'eo-cache-status': 'MISS'})
+20:17:37 [DEBUG] openai._base_client: request_id: None
+20:17:37 [DEBUG] services.ai_worker: AIWorker 完成: task_type=daily_review
+20:19:45 [INFO] services.reminder_service: ReminderService 配置已重载
+20:19:45 [INFO] main: 设置已保存并生效
+21:09:45 [INFO] services.reminder_service: ReminderService 触发提醒: ✨ 短暂休息是下一段高效工作的燃料，好好
+21:59:45 [INFO] services.reminder_service: ReminderService 触发提醒: 🌿 给自己一点喘息空间，深呼吸三次，感受
+22:49:45 [INFO] services.reminder_service: ReminderService 触发提醒: 🧘 起来活动活动！伸个懒腰、转转脖子，远
+23:39:45 [INFO] services.reminder_service: ReminderService 触发提醒: 👀 眼睛需要休息了，看看远处，让视线放松
+23:39:45 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+23:39:45 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-b37d0879-b7df-4672-b3df-47bbc51c43cd', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个关爱员工健康的小助手。请生成 5 条"休息提醒"文案，帮助长时间工作的人放松身心。\n\n要求：\n- 每条文案简短有趣（15~35 字），语气轻松温暖，不说教\n- 内容多样，可涉及：眼部放松、起身活动、深呼吸、喝水、远眺等\n- 可适当加 1~2 个 emoji 增加活泼感\n- 每条一行，不编号，不加引号\n\n请直接输出 5 条文案，每条一行：'}], 'model': 'deepseek-chat', 'max_tokens': 400, 'temperature': 0.9}}
+23:39:45 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+23:39:45 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+23:39:46 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B3346E0>
+23:39:46 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+23:39:46 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B334440>
+23:39:46 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+23:39:46 [DEBUG] httpcore.http11: send_request_headers.complete
+23:39:46 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+23:39:46 [DEBUG] httpcore.http11: send_request_body.complete
+23:39:46 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+23:39:46 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'a1a2a9f545fb11ead4307e99475b879f'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Mon, 30 Mar 2026 15:39:46 GMT'), (b'EO-LOG-UUID', b'9618651657396554596'), (b'EO-Cache-Status', b'MISS')])
+23:39:46 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+23:39:46 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+23:39:49 [DEBUG] httpcore.http11: receive_response_body.complete
+23:39:49 [DEBUG] httpcore.http11: response_closed.started
+23:39:49 [DEBUG] httpcore.http11: response_closed.complete
+23:39:49 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': 'a1a2a9f545fb11ead4307e99475b879f', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Mon, 30 Mar 2026 15:39:46 GMT', 'eo-log-uuid': '9618651657396554596', 'eo-cache-status': 'MISS'})
+23:39:49 [DEBUG] openai._base_client: request_id: None
+23:39:49 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+23:39:49 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 6 条
+00:29:45 [INFO] services.reminder_service: ReminderService 触发提醒: ⏰ 休息一下吧！闭上眼睛 20 秒，让眼
+01:19:45 [INFO] services.reminder_service: ReminderService 触发提醒: 站起来伸个懒腰吧，让僵硬的关节跳支舞！💃
+02:09:45 [INFO] services.reminder_service: ReminderService 触发提醒: 眼睛累了吗？看看窗外的绿树，给它们放个小
+02:59:45 [INFO] services.reminder_service: ReminderService 触发提醒: 喝口水，发会儿呆，大脑也需要中场休息哦！
+03:49:45 [INFO] services.reminder_service: ReminderService 触发提醒: 深呼吸三次，把疲惫呼出去，把轻松吸进来～
+03:49:45 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+03:49:45 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-d3d6ab33-ad1f-4036-80cc-f05f19c777b3', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个关爱员工健康的小助手。请生成 5 条"休息提醒"文案，帮助长时间工作的人放松身心。\n\n要求：\n- 每条文案简短有趣（15~35 字），语气轻松温暖，不说教\n- 内容多样，可涉及：眼部放松、起身活动、深呼吸、喝水、远眺等\n- 可适当加 1~2 个 emoji 增加活泼感\n- 每条一行，不编号，不加引号\n\n请直接输出 5 条文案，每条一行：'}], 'model': 'deepseek-chat', 'max_tokens': 400, 'temperature': 0.9}}
+03:49:45 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+03:49:45 [DEBUG] httpcore.connection: close.started
+03:49:45 [DEBUG] httpcore.connection: close.complete
+03:49:45 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+03:49:45 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B3210D0>
+03:49:45 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+03:49:45 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B321010>
+03:49:45 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+03:49:45 [DEBUG] httpcore.http11: send_request_headers.complete
+03:49:45 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+03:49:45 [DEBUG] httpcore.http11: send_request_body.complete
+03:49:45 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+03:49:46 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'1b44c46dd8742de22d660eb9fc3857c4'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Mon, 30 Mar 2026 19:49:46 GMT'), (b'EO-LOG-UUID', b'10278871874083053979'), (b'EO-Cache-Status', b'MISS')])
+03:49:46 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+03:49:46 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+03:49:48 [DEBUG] httpcore.http11: receive_response_body.complete
+03:49:48 [DEBUG] httpcore.http11: response_closed.started
+03:49:48 [DEBUG] httpcore.http11: response_closed.complete
+03:49:48 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '1b44c46dd8742de22d660eb9fc3857c4', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Mon, 30 Mar 2026 19:49:46 GMT', 'eo-log-uuid': '10278871874083053979', 'eo-cache-status': 'MISS'})
+03:49:48 [DEBUG] openai._base_client: request_id: None
+03:49:48 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+03:49:48 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 6 条
+04:39:45 [INFO] services.reminder_service: ReminderService 触发提醒: 手指离开键盘，转转脖子，和你的肩膀说声辛
+05:29:46 [INFO] services.reminder_service: ReminderService 触发提醒: 起来伸个懒腰吧，像猫咪一样舒展一下 🐱
+06:19:46 [INFO] services.reminder_service: ReminderService 触发提醒: 看看窗外，让眼睛和心情都透透气 🌳
+07:09:46 [INFO] services.reminder_service: ReminderService 触发提醒: 喝口水，给身体加加油再继续哦 💧
+07:59:46 [INFO] services.reminder_service: ReminderService 触发提醒: 深呼吸三次，把疲惫悄悄呼出去～
+07:59:46 [DEBUG] services.reminder_service: 缓存补充 Worker 已启动，请求 5 条
+07:59:46 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-6135ecea-84c5-4142-b47f-262c532f87b7', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个关爱员工健康的小助手。请生成 5 条"休息提醒"文案，帮助长时间工作的人放松身心。\n\n要求：\n- 每条文案简短有趣（15~35 字），语气轻松温暖，不说教\n- 内容多样，可涉及：眼部放松、起身活动、深呼吸、喝水、远眺等\n- 可适当加 1~2 个 emoji 增加活泼感\n- 每条一行，不编号，不加引号\n\n请直接输出 5 条文案，每条一行：'}], 'model': 'deepseek-chat', 'max_tokens': 400, 'temperature': 0.9}}
+07:59:46 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+07:59:46 [DEBUG] httpcore.connection: close.started
+07:59:46 [DEBUG] httpcore.connection: close.complete
+07:59:46 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+07:59:46 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B2CEE10>
+07:59:46 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+07:59:46 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B2F8A10>
+07:59:46 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+07:59:46 [DEBUG] httpcore.http11: send_request_headers.complete
+07:59:46 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+07:59:46 [DEBUG] httpcore.http11: send_request_body.complete
+07:59:46 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+07:59:46 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'114cb84e411391cb7b951c3794f22cea'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Mon, 30 Mar 2026 23:59:46 GMT'), (b'EO-LOG-UUID', b'5555594870511160039'), (b'EO-Cache-Status', b'MISS')])
+07:59:46 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+07:59:46 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+07:59:48 [DEBUG] httpcore.http11: receive_response_body.complete
+07:59:48 [DEBUG] httpcore.http11: response_closed.started
+07:59:48 [DEBUG] httpcore.http11: response_closed.complete
+07:59:48 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '114cb84e411391cb7b951c3794f22cea', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Mon, 30 Mar 2026 23:59:46 GMT', 'eo-log-uuid': '5555594870511160039', 'eo-cache-status': 'MISS'})
+07:59:48 [DEBUG] openai._base_client: request_id: None
+07:59:48 [DEBUG] services.ai_worker: AIWorker 完成: task_type=reminder_texts
+07:59:48 [INFO] services.reminder_service: 文案缓存池已补充 5 条，当前 6 条
+08:49:46 [INFO] services.reminder_service: ReminderService 触发提醒: 站起来走走，和僵硬的肩膀说拜拜 👋
+09:39:46 [INFO] services.reminder_service: ReminderService 触发提醒: 起来伸个懒腰吧，像猫咪一样舒展一下 🐱
+10:00:19 [DEBUG] services.reminder_service: ReminderService 已推迟 300 秒
+10:05:19 [INFO] services.reminder_service: ReminderService 触发提醒: 眼睛累了吗？看看窗外，给它们放个小假 🌳
+10:06:55 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-7cce4138-46d5-499d-b784-d22c643d7aea', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个任务解析助手。请将用户输入的自然语言任务描述解析为结构化 JSON。\n\n当前时间：2026-03-31 10:06\n\n规则：\n- title: 简洁的任务名称（不超过30字）\n- priority: 优先级，只能是 "high"（高/重要/紧急）、"medium"（中/普通）、"low"（低/随意）\n- due_time: 截止时间，格式为 "YYYY-MM-DD HH:MM"，无法确定时为 null\n- 如果用户说"明天"，基于今天日期推算；说"下周"推算到下周一\n\n只返回 JSON，不要解释，格式如下：\n{"title": "...", "priority": "medium", "due_time": "2026-03-31 15:00"}\n\n用户输入：特效性能优化工具使用文档'}], 'model': 'deepseek-chat', 'max_tokens': 200, 'temperature': 0.1}}
+10:06:55 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+10:06:55 [DEBUG] httpcore.connection: close.started
+10:06:55 [DEBUG] httpcore.connection: close.complete
+10:06:55 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+10:06:55 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B334230>
+10:06:55 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+10:06:55 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B334DA0>
+10:06:55 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+10:06:55 [DEBUG] httpcore.http11: send_request_headers.complete
+10:06:55 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+10:06:55 [DEBUG] httpcore.http11: send_request_body.complete
+10:06:55 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+10:06:55 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'dbfe96f99308f9714b6334ed99169a5c'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Tue, 31 Mar 2026 02:06:55 GMT'), (b'EO-LOG-UUID', b'10606268081278710409'), (b'EO-Cache-Status', b'MISS')])
+10:06:55 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+10:06:55 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+10:06:57 [DEBUG] httpcore.http11: receive_response_body.complete
+10:06:57 [DEBUG] httpcore.http11: response_closed.started
+10:06:57 [DEBUG] httpcore.http11: response_closed.complete
+10:06:57 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': 'dbfe96f99308f9714b6334ed99169a5c', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Tue, 31 Mar 2026 02:06:55 GMT', 'eo-log-uuid': '10606268081278710409', 'eo-cache-status': 'MISS'})
+10:06:57 [DEBUG] openai._base_client: request_id: None
+10:06:57 [DEBUG] services.ai_worker: AIWorker 完成: task_type=parse_task
+10:07:34 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-de9cfe55-5cd2-4530-9848-2473f221d427', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个任务解析助手。请将用户输入的自然语言任务描述解析为结构化 JSON。\n\n当前时间：2026-03-31 10:07\n\n规则：\n- title: 简洁的任务名称（不超过30字）\n- priority: 优先级，只能是 "high"（高/重要/紧急）、"medium"（中/普通）、"low"（低/随意）\n- due_time: 截止时间，格式为 "YYYY-MM-DD HH:MM"，无法确定时为 null\n- 如果用户说"明天"，基于今天日期推算；说"下周"推算到下周一\n\n只返回 JSON，不要解释，格式如下：\n{"title": "...", "priority": "medium", "due_time": "2026-03-31 15:00"}\n\n用户输入：贴图内存优化跟进'}], 'model': 'deepseek-chat', 'max_tokens': 200, 'temperature': 0.1}}
+10:07:34 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+10:07:34 [DEBUG] httpcore.connection: close.started
+10:07:34 [DEBUG] httpcore.connection: close.complete
+10:07:34 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+10:07:34 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B3364B0>
+10:07:34 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+10:07:34 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B336210>
+10:07:34 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+10:07:34 [DEBUG] httpcore.http11: send_request_headers.complete
+10:07:34 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+10:07:34 [DEBUG] httpcore.http11: send_request_body.complete
+10:07:34 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+10:07:34 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'883652f8d2039b494138c085f4eca13e'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Tue, 31 Mar 2026 02:07:34 GMT'), (b'EO-LOG-UUID', b'1326079551578000263'), (b'EO-Cache-Status', b'MISS')])
+10:07:34 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+10:07:34 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+10:07:35 [DEBUG] httpcore.http11: receive_response_body.complete
+10:07:35 [DEBUG] httpcore.http11: response_closed.started
+10:07:35 [DEBUG] httpcore.http11: response_closed.complete
+10:07:35 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '883652f8d2039b494138c085f4eca13e', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Tue, 31 Mar 2026 02:07:34 GMT', 'eo-log-uuid': '1326079551578000263', 'eo-cache-status': 'MISS'})
+10:07:35 [DEBUG] openai._base_client: request_id: None
+10:07:35 [DEBUG] services.ai_worker: AIWorker 完成: task_type=parse_task
+10:16:38 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-ce80c0fa-26be-4e50-ad8f-8d8bff0f73e6', 'content': None, 'json_data': {'messages': [{'role': 'user', 'content': '你是一个任务解析助手。请将用户输入的自然语言任务描述解析为结构化 JSON。\n\n当前时间：2026-03-31 10:16\n\n规则：\n- title: 简洁的任务名称（不超过30字）\n- priority: 优先级，只能是 "high"（高/重要/紧急）、"medium"（中/普通）、"low"（低/随意）\n- due_time: 截止时间，格式为 "YYYY-MM-DD HH:MM"，无法确定时为 null\n- 如果用户说"明天"，基于今天日期推算；说"下周"推算到下周一\n\n只返回 JSON，不要解释，格式如下：\n{"title": "...", "priority": "medium", "due_time": "2026-03-31 15:00"}\n\n用户输入：角色资产验收'}], 'model': 'deepseek-chat', 'max_tokens': 200, 'temperature': 0.1}}
+10:16:38 [DEBUG] openai._base_client: Sending HTTP Request: POST https://api.deepseek.com/v1/chat/completions
+10:16:38 [DEBUG] httpcore.connection: close.started
+10:16:38 [DEBUG] httpcore.connection: close.complete
+10:16:38 [DEBUG] httpcore.connection: connect_tcp.started host='api.deepseek.com' port=443 local_address=None timeout=10.0 socket_options=None
+10:16:38 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B337740>
+10:16:38 [DEBUG] httpcore.connection: start_tls.started ssl_context=<ssl.SSLContext object at 0x000002319B32C350> server_hostname='api.deepseek.com' timeout=10.0
+10:16:38 [DEBUG] httpcore.connection: start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x000002319B3374A0>
+10:16:38 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+10:16:38 [DEBUG] httpcore.http11: send_request_headers.complete
+10:16:38 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+10:16:38 [DEBUG] httpcore.http11: send_request_body.complete
+10:16:38 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+10:16:39 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'openresty'), (b'Content-Type', b'application/json'), (b'vary', b'origin, access-control-request-method, access-control-request-headers'), (b'access-control-allow-credentials', b'true'), (b'x-ds-trace-id', b'7bc9b7b346be9ee5fa528214cc73ac9e'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'X-Content-Type-Options', b'nosniff'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Tue, 31 Mar 2026 02:16:38 GMT'), (b'EO-LOG-UUID', b'13722197769050280388'), (b'EO-Cache-Status', b'MISS')])
+10:16:39 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+10:16:39 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+10:16:40 [DEBUG] httpcore.http11: receive_response_body.complete
+10:16:40 [DEBUG] httpcore.http11: response_closed.started
+10:16:40 [DEBUG] httpcore.http11: response_closed.complete
+10:16:40 [DEBUG] openai._base_client: HTTP Response: POST https://api.deepseek.com/v1/chat/completions "200 OK" Headers({'server': 'openresty', 'content-type': 'application/json', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'access-control-allow-credentials': 'true', 'x-ds-trace-id': '7bc9b7b346be9ee5fa528214cc73ac9e', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'x-content-type-options': 'nosniff', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'date': 'Tue, 31 Mar 2026 02:16:38 GMT', 'eo-log-uuid': '13722197769050280388', 'eo-cache-status': 'MISS'})
+10:16:40 [DEBUG] openai._base_client: request_id: None
+10:16:40 [DEBUG] services.ai_worker: AIWorker 完成: task_type=parse_task
