@@ -31,6 +31,13 @@ class SettingsDialog(QDialog):
         self._settings = settings
         self._setup_ui()
         self._load_values()
+        # 延迟 200ms 设置置顶，避免弹出时 COM 冲突崩溃（与 HistoryDialog 一致）
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(200, self._set_on_top)
+
+    def _set_on_top(self) -> None:
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.show()
 
     # ------------------------------------------------------------------ #
     #  UI 搭建
@@ -40,12 +47,8 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("设置")
         self.setFixedWidth(420)
         self.setMaximumHeight(640)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # 不在初始化时设 WindowStaysOnTopHint，延迟设置避免 COM 冲突崩溃
+        self.setWindowFlags(Qt.WindowType.Dialog)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
