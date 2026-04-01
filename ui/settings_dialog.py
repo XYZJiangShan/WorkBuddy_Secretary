@@ -40,7 +40,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("设置")
         self.setFixedWidth(420)
         self.setMaximumHeight(640)
-        self.setWindowFlags(Qt.WindowType.Dialog)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
 
         # 深色主题整体样式
         self.setStyleSheet("""
