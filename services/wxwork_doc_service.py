@@ -171,73 +171,161 @@ class WxWorkDocService:
         return bool(self._get_cookie())
 
     # ------------------------------------------------------------------ #
-    #  自动从浏览器提取 Cookie
+    #  自动从浏览器提取 Cookie（CDP 方案，支持 Chrome v130+）
     # ------------------------------------------------------------------ #
+
+    # Chrome/Edge 可执行文件的候选路径
+    _CHROME_PATHS = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Users\{username}\AppData\Local\Google\Chrome\Application\chrome.exe",
+    ]
+    _EDGE_PATHS = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ]
+    # CDP 调试端口
+    _CDP_PORT = 9222
 
     def extract_from_browser(self, browser: str = "chrome") -> ChromeCookieResult:
         """
-        从本地已登录的 Chrome / Edge 提取企微相关 Cookie。
+        通过 Chrome DevTools Protocol（CDP）从 Chrome/Edge 提取企微相关 Cookie。
+        支持 Chrome v130+ App-Bound Encryption，无需管理员权限。
 
-        参数:
-            browser: "chrome" 或 "edge"
-
-        返回:
-            ChromeCookieResult，成功则 .cookie_str 包含拼接好的 Cookie 字符串
+        流程：
+          1. 以 --remote-debugging-port=9222 启动一个隔离 Chrome 实例
+          2. 通过 HTTP 获取调试目标列表
+          3. 通过 WebSocket 调用 Network.getAllCookies
+          4. 过滤企微域名 Cookie 并拼接返回
+          5. 关闭调试实例
         """
         result = ChromeCookieResult()
+
+        import subprocess, time, json, os
+
         try:
-            import browser_cookie3
+            import requests as _req
         except ImportError:
-            result.error = "缺少依赖: py -m pip install browser-cookie3"
+            result.error = "缺少依赖: py -m pip install requests"
+            return result
+        try:
+            import websocket as _ws
+        except ImportError:
+            result.error = "缺少依赖: py -m pip install websocket-client"
             return result
 
-        try:
-            # 选择浏览器
-            if browser == "edge":
-                jar = browser_cookie3.edge(domain_name=".qq.com")
-            else:
-                jar = browser_cookie3.chrome(domain_name=".qq.com")
+        # 1. 找浏览器可执行文件
+        exe = self._find_browser_exe(browser)
+        if not exe:
+            browser_name = "Chrome" if browser == "chrome" else "Edge"
+            result.error = (
+                f"找不到 {browser_name} 安装路径。\n"
+                "请确认已安装该浏览器，或手动粘贴 Cookie。"
+            )
+            return result
 
-            # 过滤出企微相关域名的 Cookie
+        # 2. 启动带调试端口的浏览器（隔离 profile，不影响主浏览器）
+        import tempfile
+        debug_profile = os.path.join(tempfile.gettempdir(), "desksec_cdp_profile")
+        os.makedirs(debug_profile, exist_ok=True)
+
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                [
+                    exe,
+                    f"--remote-debugging-port={self._CDP_PORT}",
+                    f"--user-data-dir={debug_profile}",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-extensions",
+                    "https://doc.weixin.qq.com",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            # 3. 等待调试端口就绪（最多 12 秒）
+            port_ready = False
+            for _ in range(24):
+                time.sleep(0.5)
+                try:
+                    r = _req.get(f"http://127.0.0.1:{self._CDP_PORT}/json", timeout=2)
+                    if r.status_code == 200:
+                        port_ready = True
+                        break
+                except Exception:
+                    pass
+            if not port_ready:
+                result.error = "浏览器启动超时，请重试"
+                return result
+
+            # 4. 获取 WebSocket 调试 URL
+            targets = _req.get(f"http://127.0.0.1:{self._CDP_PORT}/json", timeout=5).json()
+            ws_url = None
+            for t in targets:
+                if t.get("type") == "page":
+                    ws_url = t.get("webSocketDebuggerUrl")
+                    break
+            if not ws_url:
+                result.error = "找不到可调试的页面，请重试"
+                return result
+
+            # 5. CDP：Network.getAllCookies
+            ws = _ws.create_connection(ws_url, timeout=10)
+            ws.send(json.dumps({"id": 1, "method": "Network.getAllCookies"}))
+            raw = ws.recv()
+            ws.close()
+
+            data = json.loads(raw)
+            all_cookies = data.get("result", {}).get("cookies", [])
+
+            # 6. 过滤企微相关域名
             matched: dict[str, str] = {}
-            seen_domains = set()
-            for cookie in jar:
-                domain = getattr(cookie, "domain", "") or ""
-                # 匹配企微域名
-                is_wxwork = any(d in domain for d in WXWORK_COOKIE_DOMAINS)
-                if is_wxwork and cookie.name and cookie.value:
-                    matched[cookie.name] = cookie.value
+            seen_domains: set = set()
+            for c in all_cookies:
+                domain = c.get("domain", "") or ""
+                name = c.get("name", "")
+                value = c.get("value", "")
+                if name and value and any(d in domain for d in WXWORK_COOKIE_DOMAINS):
+                    matched[name] = value
                     seen_domains.add(domain)
 
             if not matched:
                 result.error = (
                     "未找到企业微信相关 Cookie。\n"
-                    "请确认 Chrome 已登录企业微信文档（https://doc.weixin.qq.com），\n"
-                    "且 Chrome 当前未完全关闭。"
+                    "请在弹出的浏览器窗口中登录企业微信文档后，再次点击按钮。"
                 )
                 return result
 
-            # 拼接成 "key=value; key2=value2; ..." 格式
             result.cookie_str = "; ".join(f"{k}={v}" for k, v in matched.items())
             result.cookie_count = len(matched)
             result.domain_count = len(seen_domains)
-            logger.info("Extracted %d cookies from %d domains via %s",
+            logger.info("CDP extracted %d cookies from %d domains via %s",
                         result.cookie_count, result.domain_count, browser)
 
-        except PermissionError:
-            result.error = (
-                "无法读取 Chrome Cookie 数据库（权限不足）。\n"
-                "请确认 Chrome 已完全关闭后重试，或以管理员身份运行本程序。"
-            )
         except Exception as e:
-            msg = str(e)
-            if "profile" in msg.lower() or "path" in msg.lower():
-                result.error = "找不到 Chrome 配置文件，请确认 Chrome 已安装并登录过。"
-            else:
-                result.error = f"提取失败: {msg}"
-            logger.error("extract_from_browser error: %s", e)
+            result.error = f"提取失败: {e}"
+            logger.error("extract_from_browser CDP error: %s", e)
+        finally:
+            if proc:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
 
         return result
+
+    def _find_browser_exe(self, browser: str) -> Optional[str]:
+        """在常见路径查找浏览器可执行文件"""
+        import os
+        username = os.environ.get("USERNAME", "")
+        paths = self._EDGE_PATHS if browser == "edge" else self._CHROME_PATHS
+        for p in paths:
+            p = p.replace("{username}", username)
+            if os.path.exists(p):
+                return p
+        return None
 
     def extract_and_save(self, browser: str = "chrome") -> ChromeCookieResult:
         """提取 Cookie 并自动保存到 settings，一步到位。"""

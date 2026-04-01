@@ -447,34 +447,106 @@ class SettingsDialog(QDialog):
             self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
     def _auto_extract_cookie(self, browser: str) -> None:
-        """一键从 Chrome/Edge 自动提取企微 Cookie"""
+        """
+        两步式从 Chrome/Edge 自动提取企微 Cookie（CDP 方案）：
+          第 1 步：启动带调试端口的隔离浏览器，用户在里面登录企微文档
+          第 2 步：用户登录后再点一次，读取 Cookie 并填入
+        """
         from services.wxwork_doc_service import WxWorkDocService
         from PyQt6.QtCore import QTimer
 
         browser_name = "Chrome" if browser == "chrome" else "Edge"
-        self._auto_cookie_result.setText(f"⏳ 正在从 {browser_name} 读取 Cookie，请稍候…")
-        self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #6C63FF;")
 
-        def do_extract():
-            service = WxWorkDocService(self._settings)
-            result = service.extract_from_browser(browser)
-            if result.success:
-                self._wxwork_cookie_edit.setText(result.cookie_str)
-                self._wxwork_cookie_status.setText(
-                    f"已从 {browser_name} 读取（{result.cookie_count} 个 Cookie）"
+        # 判断是否已处于"等待登录"状态
+        if not hasattr(self, "_cdp_waiting") or not self._cdp_waiting.get(browser):
+            # ---- 第 1 步：启动浏览器 ----
+            self._auto_cookie_result.setText(
+                f"⏳ 正在启动 {browser_name}（隔离模式）...\n"
+                "请在弹出的浏览器中完成登录，然后再次点击此按钮获取 Cookie。"
+            )
+            self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #6C63FF;")
+
+            def launch_browser():
+                import subprocess, tempfile, os
+                service = WxWorkDocService(self._settings)
+                exe = service._find_browser_exe(browser)
+                if not exe:
+                    self._auto_cookie_result.setText(f"❌ 找不到 {browser_name} 安装路径")
+                    self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #FF6B6B;")
+                    return
+
+                debug_profile = os.path.join(tempfile.gettempdir(), "desksec_cdp_profile")
+                os.makedirs(debug_profile, exist_ok=True)
+
+                proc = subprocess.Popen(
+                    [
+                        exe,
+                        f"--remote-debugging-port={WxWorkDocService._CDP_PORT}",
+                        f"--user-data-dir={debug_profile}",
+                        "--no-first-run",
+                        "--no-default-browser-check",
+                        "--disable-extensions",
+                        "https://doc.weixin.qq.com",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
-                self._wxwork_cookie_status.setStyleSheet("color: #52C41A; font-size: 10px;")
+
+                # 保存进程引用 & 标记等待状态
+                if not hasattr(self, "_cdp_procs"):
+                    self._cdp_procs = {}
+                self._cdp_procs[browser] = proc
+
+                if not hasattr(self, "_cdp_waiting"):
+                    self._cdp_waiting = {}
+                self._cdp_waiting[browser] = True
+
                 self._auto_cookie_result.setText(
-                    f"✅ 成功提取 {result.cookie_count} 个 Cookie（来自 {result.domain_count} 个域名）"
-                    f"，点击保存即可生效。"
+                    f"✅ {browser_name} 已启动！请在弹出的窗口中登录企业微信文档。\n"
+                    "登录完成后，再次点击「从 Chrome 自动获取」按钮读取 Cookie。"
                 )
                 self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #52C41A;")
-            else:
-                self._auto_cookie_result.setText(f"❌ {result.error}")
-                self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #FF6B6B;")
 
-        # 延迟 100ms 执行，让 UI 先刷新出"正在读取"提示
-        QTimer.singleShot(100, do_extract)
+            QTimer.singleShot(100, launch_browser)
+
+        else:
+            # ---- 第 2 步：读取 Cookie ----
+            self._auto_cookie_result.setText(f"⏳ 正在读取 Cookie，请稍候…")
+            self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #6C63FF;")
+
+            def do_extract():
+                service = WxWorkDocService(self._settings)
+                result = service.extract_from_browser(browser)
+
+                # 关闭调试浏览器
+                procs = getattr(self, "_cdp_procs", {})
+                if browser in procs:
+                    try:
+                        procs[browser].terminate()
+                    except Exception:
+                        pass
+                    del procs[browser]
+
+                # 清除等待状态
+                if hasattr(self, "_cdp_waiting"):
+                    self._cdp_waiting[browser] = False
+
+                if result.success:
+                    self._wxwork_cookie_edit.setText(result.cookie_str)
+                    self._wxwork_cookie_status.setText(
+                        f"已从 {browser_name} 读取（{result.cookie_count} 个 Cookie）"
+                    )
+                    self._wxwork_cookie_status.setStyleSheet("color: #52C41A; font-size: 10px;")
+                    self._auto_cookie_result.setText(
+                        f"✅ 成功提取 {result.cookie_count} 个 Cookie（{result.domain_count} 个域名），"
+                        f"点击保存即可生效。"
+                    )
+                    self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #52C41A;")
+                else:
+                    self._auto_cookie_result.setText(f"❌ {result.error}")
+                    self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #FF6B6B;")
+
+            QTimer.singleShot(100, do_extract)
 
     def _on_save(self) -> None:
         self._settings.set_many({
