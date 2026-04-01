@@ -2,6 +2,7 @@
 services/wxwork_doc_service.py - 企业微信文档读取服务
 
 通过用户手动提供的 Cookie（从浏览器 DevTools 复制）
+或自动从已登录的 Chrome/Edge 本地 Cookie 数据库提取，
 读取企业微信文档内容，供 AI 分析使用。
 
 Cookie 存储在 settings 表中（key: wxwork_cookie），
@@ -11,10 +12,22 @@ from __future__ import annotations
 
 import re
 import logging
-from typing import Optional
-from dataclasses import dataclass
+from typing import Optional, List
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+# 需要提取 Cookie 的域名列表（企微 + 腾讯账号体系）
+WXWORK_COOKIE_DOMAINS = [
+    "weixin.qq.com",
+    "doc.weixin.qq.com",
+    "docs.weixin.qq.com",
+    "qyapi.weixin.qq.com",
+    "work.weixin.qq.com",
+    "wx.qq.com",
+    "qq.com",
+    "tencent.com",
+]
 
 
 @dataclass
@@ -28,6 +41,19 @@ class WxWorkDocInfo:
     @property
     def success(self) -> bool:
         return self.error is None and bool(self.content or self.title)
+
+
+@dataclass
+class ChromeCookieResult:
+    """从浏览器提取 Cookie 的结果"""
+    cookie_str: str = ""
+    domain_count: int = 0
+    cookie_count: int = 0
+    error: Optional[str] = None
+
+    @property
+    def success(self) -> bool:
+        return self.error is None and bool(self.cookie_str)
 
 
 class WxWorkDocService:
@@ -143,6 +169,82 @@ class WxWorkDocService:
 
     def has_cookie(self) -> bool:
         return bool(self._get_cookie())
+
+    # ------------------------------------------------------------------ #
+    #  自动从浏览器提取 Cookie
+    # ------------------------------------------------------------------ #
+
+    def extract_from_browser(self, browser: str = "chrome") -> ChromeCookieResult:
+        """
+        从本地已登录的 Chrome / Edge 提取企微相关 Cookie。
+
+        参数:
+            browser: "chrome" 或 "edge"
+
+        返回:
+            ChromeCookieResult，成功则 .cookie_str 包含拼接好的 Cookie 字符串
+        """
+        result = ChromeCookieResult()
+        try:
+            import browser_cookie3
+        except ImportError:
+            result.error = "缺少依赖: py -m pip install browser-cookie3"
+            return result
+
+        try:
+            # 选择浏览器
+            if browser == "edge":
+                jar = browser_cookie3.edge(domain_name=".qq.com")
+            else:
+                jar = browser_cookie3.chrome(domain_name=".qq.com")
+
+            # 过滤出企微相关域名的 Cookie
+            matched: dict[str, str] = {}
+            seen_domains = set()
+            for cookie in jar:
+                domain = getattr(cookie, "domain", "") or ""
+                # 匹配企微域名
+                is_wxwork = any(d in domain for d in WXWORK_COOKIE_DOMAINS)
+                if is_wxwork and cookie.name and cookie.value:
+                    matched[cookie.name] = cookie.value
+                    seen_domains.add(domain)
+
+            if not matched:
+                result.error = (
+                    "未找到企业微信相关 Cookie。\n"
+                    "请确认 Chrome 已登录企业微信文档（https://doc.weixin.qq.com），\n"
+                    "且 Chrome 当前未完全关闭。"
+                )
+                return result
+
+            # 拼接成 "key=value; key2=value2; ..." 格式
+            result.cookie_str = "; ".join(f"{k}={v}" for k, v in matched.items())
+            result.cookie_count = len(matched)
+            result.domain_count = len(seen_domains)
+            logger.info("Extracted %d cookies from %d domains via %s",
+                        result.cookie_count, result.domain_count, browser)
+
+        except PermissionError:
+            result.error = (
+                "无法读取 Chrome Cookie 数据库（权限不足）。\n"
+                "请确认 Chrome 已完全关闭后重试，或以管理员身份运行本程序。"
+            )
+        except Exception as e:
+            msg = str(e)
+            if "profile" in msg.lower() or "path" in msg.lower():
+                result.error = "找不到 Chrome 配置文件，请确认 Chrome 已安装并登录过。"
+            else:
+                result.error = f"提取失败: {msg}"
+            logger.error("extract_from_browser error: %s", e)
+
+        return result
+
+    def extract_and_save(self, browser: str = "chrome") -> ChromeCookieResult:
+        """提取 Cookie 并自动保存到 settings，一步到位。"""
+        result = self.extract_from_browser(browser)
+        if result.success:
+            self.save_cookie(result.cookie_str)
+        return result
 
     # ------------------------------------------------------------------ #
     #  内容提取

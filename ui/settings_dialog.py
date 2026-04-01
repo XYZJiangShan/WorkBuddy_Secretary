@@ -187,15 +187,61 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(self._section_label("🔗 企业微信文档访问"))
 
         cookie_hint = QLabel(
-            "粘贴 Cookie 后可在任务详情中读取企微文档内容供 AI 分析。\n"
-            "获取方式：Chrome 打开企微文档 → F12 → Network → 任意请求 → Request Headers → cookie 行"
+            "配置后可在任务详情中读取企微文档内容供 AI 分析。\n"
+            "推荐：点击下方按钮一键从已登录的 Chrome/Edge 自动获取。\n"
+            "也可手动粘贴：Chrome 打开企微文档 → F12 → Network → 请求 → Request Headers → cookie 行"
         )
         cookie_hint.setStyleSheet("color: #6B6880; font-size: 10px;")
         cookie_hint.setWordWrap(True)
         content_layout.addWidget(cookie_hint)
 
+        # 一键提取按钮行
+        auto_row = QHBoxLayout()
+        auto_row.setSpacing(8)
+
+        chrome_btn = QPushButton("🌐 从 Chrome 自动获取")
+        chrome_btn.setFixedHeight(30)
+        chrome_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        chrome_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #4285F4, stop:1 #34A853);
+                color: white; border: none; border-radius: 6px;
+                font-size: 11px; font-weight: bold; padding: 0 14px;
+            }
+            QPushButton:hover { opacity: 0.9; background: #4285F4; }
+            QPushButton:disabled { background: #C0BDDE; color: #888; }
+        """)
+        chrome_btn.clicked.connect(lambda: self._auto_extract_cookie("chrome"))
+
+        edge_btn = QPushButton("🌐 从 Edge 自动获取")
+        edge_btn.setFixedHeight(30)
+        edge_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edge_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #0078D4, stop:1 #00BCF2);
+                color: white; border: none; border-radius: 6px;
+                font-size: 11px; font-weight: bold; padding: 0 14px;
+            }
+            QPushButton:hover { background: #0078D4; }
+            QPushButton:disabled { background: #C0BDDE; color: #888; }
+        """)
+        edge_btn.clicked.connect(lambda: self._auto_extract_cookie("edge"))
+
+        # 操作结果提示标签
+        self._auto_cookie_result = QLabel("")
+        self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #52C41A;")
+        self._auto_cookie_result.setWordWrap(True)
+
+        auto_row.addWidget(chrome_btn)
+        auto_row.addWidget(edge_btn)
+        auto_row.addStretch()
+        content_layout.addLayout(auto_row)
+        content_layout.addWidget(self._auto_cookie_result)
+
         self._wxwork_cookie_edit = QLineEdit()
-        self._wxwork_cookie_edit.setPlaceholderText("粘贴企业微信文档 Cookie（如：pac_uid=xxx; skey=xxx; ...）")
+        self._wxwork_cookie_edit.setPlaceholderText("Cookie 将自动填入，也可手动粘贴（pac_uid=xxx; skey=xxx; ...）")
         self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)  # 隐藏敏感内容
         self._wxwork_cookie_edit.setStyleSheet("""
             QLineEdit {
@@ -399,6 +445,36 @@ class SettingsDialog(QDialog):
             self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
             self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _auto_extract_cookie(self, browser: str) -> None:
+        """一键从 Chrome/Edge 自动提取企微 Cookie"""
+        from services.wxwork_doc_service import WxWorkDocService
+        from PyQt6.QtCore import QTimer
+
+        browser_name = "Chrome" if browser == "chrome" else "Edge"
+        self._auto_cookie_result.setText(f"⏳ 正在从 {browser_name} 读取 Cookie，请稍候…")
+        self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #6C63FF;")
+
+        def do_extract():
+            service = WxWorkDocService(self._settings)
+            result = service.extract_from_browser(browser)
+            if result.success:
+                self._wxwork_cookie_edit.setText(result.cookie_str)
+                self._wxwork_cookie_status.setText(
+                    f"已从 {browser_name} 读取（{result.cookie_count} 个 Cookie）"
+                )
+                self._wxwork_cookie_status.setStyleSheet("color: #52C41A; font-size: 10px;")
+                self._auto_cookie_result.setText(
+                    f"✅ 成功提取 {result.cookie_count} 个 Cookie（来自 {result.domain_count} 个域名）"
+                    f"，点击保存即可生效。"
+                )
+                self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #52C41A;")
+            else:
+                self._auto_cookie_result.setText(f"❌ {result.error}")
+                self._auto_cookie_result.setStyleSheet("font-size: 10px; color: #FF6B6B;")
+
+        # 延迟 100ms 执行，让 UI 先刷新出"正在读取"提示
+        QTimer.singleShot(100, do_extract)
 
     def _on_save(self) -> None:
         self._settings.set_many({
