@@ -416,6 +416,7 @@ class TaskDetailPanel(QDialog):
         self.setWindowTitle(f"任务详情 — {task.title}")
         self.setWindowFlags(
             Qt.WindowType.Dialog
+            | Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAcceptDrops(True)
