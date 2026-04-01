@@ -172,6 +172,12 @@ class _DocRow(QWidget):
         else:
             QMessageBox.warning(self, "文件不存在", f"找不到文件:\n{target}")
 
+    def mousePressEvent(self, event) -> None:
+        """点击整行等同于点「打开」按钮"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._open()
+        super().mousePressEvent(event)
+
 
 
 
