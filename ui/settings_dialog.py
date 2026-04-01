@@ -31,13 +31,6 @@ class SettingsDialog(QDialog):
         self._settings = settings
         self._setup_ui()
         self._load_values()
-        # 延迟 200ms 设置置顶，避免弹出时 COM 冲突崩溃（与 HistoryDialog 一致）
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(200, self._set_on_top)
-
-    def _set_on_top(self) -> None:
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.show()
 
     # ------------------------------------------------------------------ #
     #  UI 搭建

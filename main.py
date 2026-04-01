@@ -231,6 +231,8 @@ def _open_settings(settings, ai_service, reminder_service,
     dialog.settings_saved.connect(on_saved)
     if first_run:
         dialog.setWindowTitle("欢迎使用小秘书 - 请先配置 AI")
+    dialog.raise_()
+    dialog.activateWindow()
     dialog.exec()
 
 
