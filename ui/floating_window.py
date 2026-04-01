@@ -200,12 +200,14 @@ class FloatingWindow(QWidget):
         row.setContentsMargins(12, 0, 8, 0)
         row.setSpacing(4)
 
-        icon_label = QLabel("🤖")
-        icon_label.setFont(QFont("Segoe UI Emoji", 14))
-        icon_label.setFixedWidth(24)
+        icon_label = QLabel("✦")
+        icon_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        icon_label.setStyleSheet("color: #8B85FF;")
+        icon_label.setFixedWidth(20)
 
-        self._title_label = QLabel("小秘书")
-        self._title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Weight.Bold))
+        self._title_label = QLabel("DeskSec")
+        self._title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self._title_label.setStyleSheet("color: #8B85FF; letter-spacing: 1px;")
 
         row.addWidget(icon_label)
         row.addWidget(self._title_label)
@@ -360,8 +362,8 @@ class FloatingWindow(QWidget):
             }}
         """)
 
-        # ---- 标题栏文字 ----
-        self._title_label.setStyleSheet(f"color: {theme.text_primary}; background: transparent;")
+        # ---- 标题栏文字（品牌色固定）----
+        self._title_label.setStyleSheet("color: #8B85FF; background: transparent; letter-spacing: 1px;")
 
         # ---- 标题栏按钮（统一颜色）----
         btn_style = f"""
