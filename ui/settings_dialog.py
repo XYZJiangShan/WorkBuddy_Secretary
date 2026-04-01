@@ -40,35 +40,31 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("设置")
         self.setFixedWidth(420)
         self.setMaximumHeight(640)
-        # 不在初始化时设 WindowStaysOnTopHint，延迟设置避免 COM 冲突崩溃
         self.setWindowFlags(Qt.WindowType.Dialog)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-
-        card = QWidget()
-        card.setObjectName("SettingsCard")
-        card.setStyleSheet("""
-            #SettingsCard {
-                background: rgba(254, 252, 247, 0.97);
-                border-radius: 16px;
-                border: 1px solid rgba(108, 99, 255, 0.18);
+        # 深色主题整体样式
+        self.setStyleSheet("""
+            QDialog {
+                background: #1E1B30;
             }
+            QLabel { color: #E8E5FF; background: transparent; }
+            QCheckBox { color: #E8E5FF; font-size: 11px; }
+            QCheckBox::indicator { width: 16px; height: 16px; }
         """)
 
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(0, 0, 0, 0)
-        card_layout.setSpacing(0)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
         # ---- 标题行 ----
         title_bar = QWidget()
-        title_bar.setFixedHeight(52)
+        title_bar.setFixedHeight(48)
         title_row = QHBoxLayout(title_bar)
         title_row.setContentsMargins(20, 0, 16, 0)
 
         title_lbl = QLabel("⚙️  设置")
         title_lbl.setFont(QFont("Microsoft YaHei", 13, QFont.Weight.Bold))
-        title_lbl.setStyleSheet("color: #2D2B3D;")
+        title_lbl.setStyleSheet("color: #8B85FF;")
 
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(24, 24)
@@ -82,9 +78,9 @@ class SettingsDialog(QDialog):
         title_row.addWidget(title_lbl)
         title_row.addStretch()
         title_row.addWidget(close_btn)
-        card_layout.addWidget(title_bar)
+        root.addWidget(title_bar)
 
-        self._add_divider(card_layout)
+        self._add_divider(root)
 
         # ---- 滚动内容区 ----
         scroll = QScrollArea()
@@ -93,7 +89,7 @@ class SettingsDialog(QDialog):
         scroll.setStyleSheet("""
             QScrollArea { border: none; background: transparent; }
             QScrollBar:vertical { width: 4px; background: transparent; }
-            QScrollBar::handle:vertical { background: rgba(108,99,255,0.3); border-radius: 2px; }
+            QScrollBar::handle:vertical { background: rgba(139,133,255,0.3); border-radius: 2px; }
         """)
 
         scroll_widget = QWidget()
@@ -107,7 +103,7 @@ class SettingsDialog(QDialog):
 
         # AI 总开关
         self._ai_enabled_check = QCheckBox("启用 AI 功能（任务智能解析 / 提醒文案 / 今日复盘）")
-        self._ai_enabled_check.setStyleSheet("color: #2D2B3D; font-size: 11px; font-weight: bold;")
+        self._ai_enabled_check.setStyleSheet("color: #E8E5FF; font-size: 11px; font-weight: bold;")
         self._ai_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._ai_enabled_check)
 
@@ -134,7 +130,7 @@ class SettingsDialog(QDialog):
         # ---- 2. 提醒配置 ----
         content_layout.addWidget(self._section_label("🔔 提醒配置"))
         self._enabled_check = QCheckBox("启用定时休息提醒")
-        self._enabled_check.setStyleSheet("color: #2D2B3D; font-size: 11px;")
+        self._enabled_check.setStyleSheet("color: #E8E5FF; font-size: 11px;")
         self._enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._enabled_check)
 
@@ -147,7 +143,7 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(self._section_label("🎨 外观配置"))
 
         self._dark_mode_check = QCheckBox("深色模式")
-        self._dark_mode_check.setStyleSheet("color: #2D2B3D; font-size: 11px;")
+        self._dark_mode_check.setStyleSheet("color: #E8E5FF; font-size: 11px;")
         self._dark_mode_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._dark_mode_check)
 
@@ -175,7 +171,7 @@ class SettingsDialog(QDialog):
         # ---- 5. 热键配置 ----
         content_layout.addWidget(self._section_label("⌨️ 全局热键"))
         self._hotkey_enabled_check = QCheckBox("启用全局热键（Alt+空格 唤出窗口）")
-        self._hotkey_enabled_check.setStyleSheet("color: #2D2B3D; font-size: 11px;")
+        self._hotkey_enabled_check.setStyleSheet("color: #E8E5FF; font-size: 11px;")
         self._hotkey_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._hotkey_enabled_check)
 
@@ -187,7 +183,7 @@ class SettingsDialog(QDialog):
             "推荐：点击下方按钮一键从已登录的 Chrome/Edge 自动获取。\n"
             "也可手动粘贴：Chrome 打开企微文档 → F12 → Network → 请求 → Request Headers → cookie 行"
         )
-        cookie_hint.setStyleSheet("color: #6B6880; font-size: 10px;")
+        cookie_hint.setStyleSheet("color: #A09DB8; font-size: 10px;")
         cookie_hint.setWordWrap(True)
         content_layout.addWidget(cookie_hint)
 
@@ -241,11 +237,11 @@ class SettingsDialog(QDialog):
         self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Password)  # 隐藏敏感内容
         self._wxwork_cookie_edit.setStyleSheet("""
             QLineEdit {
-                border: 1px solid #C0BDDE; border-radius: 6px;
-                padding: 6px 10px; font-size: 10px; color: #2D2B3D;
-                background: rgba(255,255,255,0.6);
+                border: 1px solid rgba(139,133,255,0.3); border-radius: 6px;
+                padding: 6px 10px; font-size: 10px; color: #E8E5FF;
+                background: rgba(40,36,62,0.8);
             }
-            QLineEdit:focus { border-color: #6C63FF; }
+            QLineEdit:focus { border-color: #8B85FF; }
         """)
         content_layout.addWidget(self._wxwork_cookie_edit)
 
@@ -256,18 +252,18 @@ class SettingsDialog(QDialog):
         show_cookie_btn.setFixedHeight(24)
         show_cookie_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         show_cookie_btn.setStyleSheet("""
-            QPushButton { background: transparent; border: 1px solid #C0BDDE;
-                border-radius: 4px; color: #6B6880; font-size: 10px; padding: 0 8px; }
-            QPushButton:hover { background: #F0EEF8; }
+            QPushButton { background: transparent; border: 1px solid rgba(139,133,255,0.3);
+                border-radius: 4px; color: #A09DB8; font-size: 10px; padding: 0 8px; }
+            QPushButton:hover { background: rgba(139,133,255,0.1); }
         """)
         show_cookie_btn.clicked.connect(self._toggle_cookie_visibility)
         clear_cookie_btn = QPushButton("清除")
         clear_cookie_btn.setFixedHeight(24)
         clear_cookie_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         clear_cookie_btn.setStyleSheet("""
-            QPushButton { background: transparent; border: 1px solid #C0BDDE;
+            QPushButton { background: transparent; border: 1px solid rgba(255,107,107,0.3);
                 border-radius: 4px; color: #FF6B6B; font-size: 10px; padding: 0 8px; }
-            QPushButton:hover { background: rgba(255,107,107,0.08); }
+            QPushButton:hover { background: rgba(255,107,107,0.1); }
         """)
         clear_cookie_btn.clicked.connect(lambda: self._wxwork_cookie_edit.clear())
         cookie_status_row.addWidget(self._wxwork_cookie_status)
@@ -286,12 +282,12 @@ class SettingsDialog(QDialog):
             "将任务数据自动备份到 GitHub 私有仓库，换电脑后一键恢复。\n"
             "仓库地址需包含 Token，格式：https://<token>@github.com/用户名/仓库名.git"
         )
-        sync_hint.setStyleSheet("color: #6B6880; font-size: 10px;")
+        sync_hint.setStyleSheet("color: #A09DB8; font-size: 10px;")
         sync_hint.setWordWrap(True)
         content_layout.addWidget(sync_hint)
 
         self._sync_enabled_check = QCheckBox("启用 GitHub 自动同步")
-        self._sync_enabled_check.setStyleSheet("color: #2D2B3D; font-size: 11px; font-weight: bold;")
+        self._sync_enabled_check.setStyleSheet("color: #E8E5FF; font-size: 11px; font-weight: bold;")
         self._sync_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._sync_enabled_check)
 
@@ -336,9 +332,9 @@ class SettingsDialog(QDialog):
 
         content_layout.addStretch()
         scroll.setWidget(scroll_widget)
-        card_layout.addWidget(scroll, 1)
+        root.addWidget(scroll, 1)
 
-        self._add_divider(card_layout)
+        self._add_divider(root)
 
         # ---- 底部按钮 ----
         btn_area = QWidget()
@@ -363,20 +359,18 @@ class SettingsDialog(QDialog):
         cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background: transparent; color: #6B6880;
-                border: 1px solid #C0BDDE; border-radius: 8px;
+                background: transparent; color: #A09DB8;
+                border: 1px solid rgba(139,133,255,0.3); border-radius: 8px;
                 padding: 6px 16px; font-size: 11px;
             }
-            QPushButton:hover { background: #F0EEF8; }
+            QPushButton:hover { background: rgba(139,133,255,0.1); }
         """)
         cancel_btn.clicked.connect(self.close)
 
         btn_row.addStretch()
         btn_row.addWidget(save_btn)
         btn_row.addWidget(cancel_btn)
-        card_layout.addWidget(btn_area)
-
-        root.addWidget(card)
+        root.addWidget(btn_area)
 
     # ------------------------------------------------------------------ #
     #  辅助构建函数
@@ -401,7 +395,7 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         label = QLabel(label_text)
-        label.setStyleSheet("color: #6B6880; font-size: 11px;")
+        label.setStyleSheet("color: #A09DB8; font-size: 11px;")
         label.setFixedWidth(72)
         layout.addWidget(label)
         layout.addWidget(widget, 1)
@@ -440,7 +434,7 @@ class SettingsDialog(QDialog):
     def _slider_row(self, label_text: str, slider: QSlider, value_label: QLabel) -> QHBoxLayout:
         row = QHBoxLayout()
         label = QLabel(label_text)
-        label.setStyleSheet("color: #6B6880; font-size: 11px;")
+        label.setStyleSheet("color: #A09DB8; font-size: 11px;")
         label.setFixedWidth(72)
         row.addWidget(label)
         row.addWidget(slider, 1)
@@ -455,11 +449,11 @@ class SettingsDialog(QDialog):
             edit.setEchoMode(QLineEdit.EchoMode.Password)
         edit.setStyleSheet("""
             QLineEdit {
-                background: rgba(240,238,248,0.7);
-                border: 1px solid rgba(108,99,255,0.2);
-                border-radius: 6px; padding: 4px 8px; color: #2D2B3D;
+                background: rgba(40,36,62,0.8);
+                border: 1px solid rgba(139,133,255,0.2);
+                border-radius: 6px; padding: 4px 8px; color: #E8E5FF;
             }
-            QLineEdit:focus { border: 1px solid #6C63FF; background: rgba(240,238,248,0.95); }
+            QLineEdit:focus { border: 1px solid #8B85FF; background: rgba(40,36,62,0.95); }
         """)
         return edit
 
