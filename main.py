@@ -24,6 +24,7 @@ from services.ai_service import AIService
 from services.reminder_service import ReminderService
 from services.pomodoro_service import PomodoroService
 from services.hotkey_service import HotkeyService
+from services.sync_service import SyncService
 
 # ---- 日志 ----
 logging.basicConfig(
@@ -96,6 +97,18 @@ def main() -> int:
     hotkey_service = HotkeyService(
         hotkey=settings.get("hotkey_toggle_window", "alt+space")
     )
+    sync_service = SyncService(settings)
+
+    # 启动时从 GitHub 拉取（后台，不阻塞 UI）
+    def _startup_pull():
+        if sync_service.is_enabled():
+            logger.info("启动同步：从 GitHub 拉取数据…")
+            result = sync_service.pull_on_startup()
+            if result.pulled:
+                logger.info("启动同步：已从 GitHub 拉取最新数据")
+            elif not result.success:
+                logger.warning("启动同步失败: %s", result.message)
+    QTimer.singleShot(2000, _startup_pull)  # 延迟 2 秒，等 Qt 事件循环稳定
 
     pomodoro_service.update_durations(
         focus_min=settings.get_int("pomodoro_focus_minutes", 25),
@@ -128,6 +141,14 @@ def main() -> int:
     def quit_app():
         hotkey_service.stop()
         reminder_service.stop()
+        sync_service.stop()
+        # 退出时推送（同步，最多等 10 秒）
+        if sync_service.is_enabled():
+            logger.info("退出同步：推送数据到 GitHub…")
+            try:
+                sync_service.push_now()
+            except Exception as e:
+                logger.warning("退出同步失败: %s", e)
         close_db()
         app.quit()
 
@@ -145,14 +166,14 @@ def main() -> int:
 
     main_window.open_settings.connect(
         lambda: _open_settings(settings, ai_service, reminder_service,
-                               pomodoro_service, hotkey_service, main_window)
+                               pomodoro_service, hotkey_service, sync_service, main_window)
     )
     main_window.open_review.connect(
         lambda: _open_review(ai_service, task_repo, settings, main_window)
     )
     tray.open_settings.connect(
         lambda: _open_settings(settings, ai_service, reminder_service,
-                               pomodoro_service, hotkey_service, main_window)
+                               pomodoro_service, hotkey_service, sync_service, main_window)
     )
 
     # ---- 启动 ----
@@ -161,6 +182,7 @@ def main() -> int:
     main_window.show()
     main_window.raise_()
     reminder_service.start()
+    sync_service.start()   # 启动定时同步
 
     if settings.get_bool("hotkey_enabled", True):
         hotkey_service.start()
@@ -168,7 +190,7 @@ def main() -> int:
     if not ai_service.is_configured():
         QTimer.singleShot(500, lambda: _open_settings(
             settings, ai_service, reminder_service,
-            pomodoro_service, hotkey_service, main_window,
+            pomodoro_service, hotkey_service, sync_service, main_window,
             first_run=True
         ))
 
@@ -177,7 +199,7 @@ def main() -> int:
 
 
 def _open_settings(settings, ai_service, reminder_service,
-                   pomodoro_service, hotkey_service, parent,
+                   pomodoro_service, hotkey_service, sync_service, parent,
                    first_run: bool = False):
     from ui.settings_dialog import SettingsDialog
     dialog = SettingsDialog(settings, parent=parent)
@@ -203,6 +225,7 @@ def _open_settings(settings, ai_service, reminder_service,
             )
         else:
             hotkey_service.stop()
+        sync_service.reload_settings()   # 同步配置变更后重新加载
         logger.info("设置已保存并全部生效")
 
     dialog.settings_saved.connect(on_saved)

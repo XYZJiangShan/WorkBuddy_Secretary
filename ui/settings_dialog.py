@@ -281,6 +281,64 @@ class SettingsDialog(QDialog):
         content_layout.addLayout(cookie_status_row)
 
         content_layout.addStretch()
+
+        # ---- 7. GitHub 数据同步 ----
+        self._add_divider(content_layout)
+        content_layout.addWidget(self._section_label("☁️ GitHub 数据同步"))
+
+        sync_hint = QLabel(
+            "将任务数据自动备份到 GitHub 私有仓库，换电脑后一键恢复。\n"
+            "仓库地址需包含 Token，格式：https://<token>@github.com/用户名/仓库名.git"
+        )
+        sync_hint.setStyleSheet("color: #6B6880; font-size: 10px;")
+        sync_hint.setWordWrap(True)
+        content_layout.addWidget(sync_hint)
+
+        self._sync_enabled_check = QCheckBox("启用 GitHub 自动同步")
+        self._sync_enabled_check.setStyleSheet("color: #2D2B3D; font-size: 11px; font-weight: bold;")
+        self._sync_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        content_layout.addWidget(self._sync_enabled_check)
+
+        self._sync_config_group = QWidget()
+        sync_group_layout = QVBoxLayout(self._sync_config_group)
+        sync_group_layout.setContentsMargins(12, 4, 0, 0)
+        sync_group_layout.setSpacing(8)
+
+        self._sync_repo_input = self._make_line_edit(
+            "https://ghp_xxx@github.com/你的用户名/仓库名.git", password=False
+        )
+        sync_group_layout.addWidget(self._field_row("仓库地址", self._sync_repo_input))
+
+        self._sync_interval_slider, self._sync_interval_label = self._make_slider(5, 120, 30, "分钟")
+        sync_group_layout.addLayout(
+            self._slider_row("同步间隔", self._sync_interval_slider, self._sync_interval_label)
+        )
+
+        # 手动同步按钮 + 状态
+        sync_btn_row = QHBoxLayout()
+        sync_now_btn = QPushButton("🔄 立即同步")
+        sync_now_btn.setFixedHeight(28)
+        sync_now_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        sync_now_btn.setStyleSheet("""
+            QPushButton { background: #6C63FF; color: white; border: none;
+                border-radius: 6px; font-size: 11px; padding: 0 14px; }
+            QPushButton:hover { background: #8B85FF; }
+            QPushButton:disabled { background: #C0BDDE; color: #888; }
+        """)
+        sync_now_btn.clicked.connect(self._on_sync_now)
+
+        self._sync_status_lbl = QLabel("上次同步：从未")
+        self._sync_status_lbl.setStyleSheet("color: #A09DB8; font-size: 10px;")
+
+        sync_btn_row.addWidget(sync_now_btn)
+        sync_btn_row.addStretch()
+        sync_btn_row.addWidget(self._sync_status_lbl)
+        sync_group_layout.addLayout(sync_btn_row)
+
+        content_layout.addWidget(self._sync_config_group)
+        self._sync_enabled_check.toggled.connect(self._sync_config_group.setEnabled)
+
+        content_layout.addStretch()
         scroll.setWidget(scroll_widget)
         card_layout.addWidget(scroll, 1)
 
@@ -440,6 +498,17 @@ class SettingsDialog(QDialog):
             self._wxwork_cookie_status.setText("未配置")
             self._wxwork_cookie_status.setStyleSheet("color: #A09DB8; font-size: 10px;")
 
+        # GitHub 同步
+        sync_enabled = self._settings.get_bool("sync_enabled", False)
+        self._sync_enabled_check.setChecked(sync_enabled)
+        self._sync_config_group.setEnabled(sync_enabled)
+        self._sync_repo_input.setText(self._settings.get("sync_github_repo", ""))
+        self._sync_interval_slider.setValue(self._settings.get_int("sync_interval_minutes", 30))
+        # 更新上次同步时间
+        from services.sync_service import SyncService
+        svc = SyncService(self._settings)
+        self._sync_status_lbl.setText(f"上次同步：{svc.get_last_sync_time()}")
+
     def _toggle_cookie_visibility(self) -> None:
         if self._wxwork_cookie_edit.echoMode() == QLineEdit.EchoMode.Password:
             self._wxwork_cookie_edit.setEchoMode(QLineEdit.EchoMode.Normal)
@@ -564,9 +633,40 @@ class SettingsDialog(QDialog):
             "pomodoro_long_break_minutes": str(self._long_break_slider.value()),
             "hotkey_enabled": "1" if self._hotkey_enabled_check.isChecked() else "0",
             "wxwork_cookie": self._wxwork_cookie_edit.text().strip(),
+            # GitHub 同步
+            "sync_enabled": "1" if self._sync_enabled_check.isChecked() else "0",
+            "sync_github_repo": self._sync_repo_input.text().strip(),
+            "sync_interval_minutes": str(self._sync_interval_slider.value()),
         })
         self.settings_saved.emit()
         self.close()
+
+    def _on_sync_now(self) -> None:
+        """手动立即同步"""
+        from services.sync_service import SyncService
+        from PyQt6.QtCore import QTimer
+
+        self._sync_status_lbl.setText("⏳ 同步中…")
+        self._sync_status_lbl.setStyleSheet("color: #6C63FF; font-size: 10px;")
+
+        # 先保存仓库配置（确保 SyncService 能读到最新值）
+        self._settings.set_many({
+            "sync_enabled": "1" if self._sync_enabled_check.isChecked() else "0",
+            "sync_github_repo": self._sync_repo_input.text().strip(),
+            "sync_interval_minutes": str(self._sync_interval_slider.value()),
+        })
+
+        def do_sync():
+            svc = SyncService(self._settings)
+            result = svc.push_now()
+            if result.success:
+                self._sync_status_lbl.setText(f"✅ {result.message}")
+                self._sync_status_lbl.setStyleSheet("color: #52C41A; font-size: 10px;")
+            else:
+                self._sync_status_lbl.setText(f"❌ {result.message}")
+                self._sync_status_lbl.setStyleSheet("color: #FF6B6B; font-size: 10px;")
+
+        QTimer.singleShot(100, do_sync)
 
     # ------------------------------------------------------------------ #
     #  鼠标拖拽
