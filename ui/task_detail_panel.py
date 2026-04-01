@@ -34,14 +34,130 @@ from PyQt6.QtWidgets import (
 from data.task_repository import Task, TaskRepository
 from data.task_note_repository import TaskNote, TaskNoteRepository
 
+
 # 支持的文件类型
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm"}
+DOC_EXTS   = {
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".txt", ".md", ".csv", ".zip", ".rar", ".7z",
+}
+
+# 文档类型图标映射
+def _doc_icon(filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    icons = {
+        ".pdf": "📄", ".doc": "📝", ".docx": "📝",
+        ".xls": "📊", ".xlsx": "📊", ".csv": "📊",
+        ".ppt": "📑", ".pptx": "📑",
+        ".txt": "📃", ".md": "📃",
+        ".zip": "📦", ".rar": "📦", ".7z": "📦",
+    }
+    return icons.get(ext, "📎")
 
 
 # --------------------------------------------------------------------------- #
-#  缩略图卡片
+#  文档/链接行
 # --------------------------------------------------------------------------- #
+
+class _DocRow(QWidget):
+    """单条文档链接/本地文件行"""
+    delete_requested = pyqtSignal(int)
+
+    def __init__(self, note, parent=None):
+        super().__init__(parent)
+        self._note = note
+        self.setObjectName("DocRow")
+        self.setStyleSheet("""
+            #DocRow { background: rgba(139,99,255,0.06); border-radius: 8px; }
+            #DocRow:hover { background: rgba(139,99,255,0.14); }
+        """)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 7, 8, 7)
+        row.setSpacing(8)
+
+        # 图标
+        if self._note.is_link:
+            icon_txt = self._link_icon(self._note.content or "")
+        else:
+            icon_txt = _doc_icon(self._note.file_name or "")
+        icon = QLabel(icon_txt)
+        icon.setFont(QFont("Segoe UI Emoji", 14))
+        icon.setFixedWidth(22)
+
+        # 信息列
+        info_col = QVBoxLayout()
+        info_col.setSpacing(1)
+
+        display = self._note.file_name or self._note.content or ""
+        name_lbl = QLabel(display[:50] + "…" if len(display) > 50 else display)
+        name_lbl.setStyleSheet("color: #C8C5E8; font-size: 10px; font-weight: bold;")
+        name_lbl.setToolTip(self._note.content or "")
+        info_col.addWidget(name_lbl)
+
+        if self._note.is_link:
+            url_lbl = QLabel(self._note.content or "")
+            url_lbl.setStyleSheet("color: #8B85FF; font-size: 9px;")
+            url_lbl.setToolTip(self._note.content or "")
+            info_col.addWidget(url_lbl)
+        elif self._note.file_size:
+            size_lbl = QLabel(f"{self._note.file_size / 1024:.1f} KB")
+            size_lbl.setStyleSheet("color: #5C5880; font-size: 9px;")
+            info_col.addWidget(size_lbl)
+
+        # 打开按钮
+        open_btn = QPushButton("🔗 打开" if self._note.is_link else "▶ 打开")
+        open_btn.setFixedSize(QSize(64, 24))
+        open_btn.setStyleSheet("""
+            QPushButton { background: rgba(139,133,255,0.2); color: #C8C5E8;
+                border: none; border-radius: 5px; font-size: 10px; }
+            QPushButton:hover { background: #8B85FF; color: white; }
+        """)
+        open_btn.clicked.connect(self._open)
+
+        # 删除按钮
+        del_btn = QPushButton("✕")
+        del_btn.setFixedSize(20, 20)
+        del_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: none; color: #5C5880; font-size: 11px; }
+            QPushButton:hover { color: #FF6B6B; }
+        """)
+        del_btn.clicked.connect(lambda: self.delete_requested.emit(self._note.id))
+
+        row.addWidget(icon)
+        row.addLayout(info_col, 1)
+        row.addWidget(open_btn)
+        row.addWidget(del_btn)
+
+    def _link_icon(self, url: str) -> str:
+        if "weixin" in url or "wxwork" in url or "qyapi" in url:
+            return "💬"
+        if "feishu" in url or "larksuite" in url:
+            return "🪶"
+        if "notion" in url:
+            return "📓"
+        if "docs.google" in url or "sheets.google" in url:
+            return "📊"
+        if "github" in url:
+            return "🐙"
+        return "🔗"
+
+    def _open(self) -> None:
+        import webbrowser
+        target = self._note.content or ""
+        if self._note.is_link:
+            webbrowser.open(target)
+        elif target and Path(target).exists():
+            os.startfile(target)
+        else:
+            QMessageBox.warning(self, "文件不存在", f"找不到文件:\n{target}")
+
+
+
 
 class _ThumbCard(QWidget):
     """单张图片缩略图卡片"""
@@ -465,6 +581,60 @@ class TaskDetailPanel(QDialog):
         vid_scroll.setWidget(self._vid_container)
         card_layout.addWidget(vid_scroll)
 
+        self._add_divider(card_layout)
+
+        # ---- 文档链接区 ----
+        doc_header_row = QHBoxLayout()
+        doc_hdr = QLabel("🔗 文档 & 链接")
+        doc_hdr.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
+        doc_hdr.setStyleSheet("color: #8B85FF;")
+
+        add_link_btn = QPushButton("+ 粘贴链接")
+        add_link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_link_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: 1px dashed rgba(139,133,255,0.4);
+                border-radius: 6px; color: #8B85FF; font-size: 10px; padding: 3px 10px; }
+            QPushButton:hover { background: rgba(139,133,255,0.1); }
+        """)
+        add_link_btn.clicked.connect(self._add_link_from_clipboard)
+
+        add_file_btn = QPushButton("+ 本地文件")
+        add_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_file_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: 1px dashed rgba(139,133,255,0.4);
+                border-radius: 6px; color: #8B85FF; font-size: 10px; padding: 3px 10px; }
+            QPushButton:hover { background: rgba(139,133,255,0.1); }
+        """)
+        add_file_btn.clicked.connect(self._pick_doc_file)
+
+        doc_header_row.addWidget(doc_hdr)
+        doc_header_row.addStretch()
+        doc_header_row.addWidget(add_link_btn)
+        doc_header_row.addWidget(add_file_btn)
+        card_layout.addLayout(doc_header_row)
+
+        # 文档列表
+        doc_scroll = QScrollArea()
+        doc_scroll.setWidgetResizable(True)
+        doc_scroll.setFixedHeight(110)
+        doc_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        self._doc_container = QWidget()
+        self._doc_container.setStyleSheet("background: transparent;")
+        self._doc_list_layout = QVBoxLayout(self._doc_container)
+        self._doc_list_layout.setContentsMargins(0, 0, 0, 0)
+        self._doc_list_layout.setSpacing(4)
+        self._doc_list_layout.addStretch()
+
+        doc_scroll.setWidget(self._doc_container)
+        card_layout.addWidget(doc_scroll)
+
+        # 提示
+        self._link_hint = QLabel("💡 支持企业微信/飞书/Notion 链接，或粘贴任意 URL；也可拖拽 PDF/Word/Excel 等文件")
+        self._link_hint.setStyleSheet("color: rgba(139,133,255,0.5); font-size: 9px;")
+        self._link_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(self._link_hint)
+
     def _add_divider(self, layout) -> None:
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -496,6 +666,11 @@ class TaskDetailPanel(QDialog):
         videos = [n for n in notes if n.is_video]
         for note in videos:
             self._add_video_row(note)
+
+        # 链接 & 文档文件
+        docs = [n for n in notes if n.is_link or n.is_doc_file]
+        for note in docs:
+            self._add_doc_row(note)
 
     # ------------------------------------------------------------------ #
     #  文字保存
@@ -577,6 +752,61 @@ class TaskDetailPanel(QDialog):
         self._vid_list_layout.insertWidget(count - 1, row)
 
     # ------------------------------------------------------------------ #
+    #  链接 & 文档操作
+    # ------------------------------------------------------------------ #
+
+    def _add_link_from_clipboard(self) -> None:
+        """从剪贴板读取 URL，支持企业微信/飞书/Notion/任意链接"""
+        clipboard = QApplication.clipboard()
+        text = clipboard.text().strip()
+        if not text:
+            QMessageBox.information(self, "提示", "剪贴板为空，请先复制链接")
+            return
+        if not (text.startswith("http://") or text.startswith("https://")
+                or text.startswith("wxwork://") or text.startswith("feishu://")):
+            # 尝试补全 https://
+            if "." in text and " " not in text:
+                text = "https://" + text
+            else:
+                QMessageBox.warning(self, "格式错误", "请复制有效的网址链接（http/https）")
+                return
+        try:
+            note = self._note_repo.add_link(self._task.id, text)
+            self._add_doc_row(note)
+            self._show_link_hint("✓ 链接已添加", success=True)
+        except Exception as e:
+            QMessageBox.warning(self, "添加失败", str(e))
+
+    def _pick_doc_file(self) -> None:
+        """选择本地文档文件"""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "选择文档文件", "",
+            "文档文件 (*.pdf *.doc *.docx *.xls *.xlsx *.ppt *.pptx *.txt *.md *.csv *.zip *.rar);;所有文件 (*)"
+        )
+        for p in paths:
+            try:
+                note = self._note_repo.add_doc_file(self._task.id, p)
+                self._add_doc_row(note)
+            except Exception as e:
+                QMessageBox.warning(self, "添加失败", str(e))
+
+    def _add_doc_row(self, note: TaskNote) -> None:
+        row = _DocRow(note, self._doc_container)
+        row.delete_requested.connect(self._delete_note)
+        count = self._doc_list_layout.count()
+        self._doc_list_layout.insertWidget(count - 1, row)
+
+    def _show_link_hint(self, msg: str, success: bool = False) -> None:
+        color = "#3DDB6B" if success else "#FF6B6B"
+        self._link_hint.setText(msg)
+        self._link_hint.setStyleSheet(f"color: {color}; font-size: 9px; font-weight: bold;")
+        QTimer.singleShot(3000, self._reset_link_hint)
+
+    def _reset_link_hint(self) -> None:
+        self._link_hint.setText("💡 支持企业微信/飞书/Notion 链接，或粘贴任意 URL；也可拖拽 PDF/Word/Excel 等文件")
+        self._link_hint.setStyleSheet("color: rgba(139,133,255,0.5); font-size: 9px;")
+
+    # ------------------------------------------------------------------ #
     #  删除
     # ------------------------------------------------------------------ #
 
@@ -589,7 +819,7 @@ class TaskDetailPanel(QDialog):
         self._load_notes()
 
     def _clear_attachments(self) -> None:
-        """清空图片和视频 UI（不清文字）"""
+        """清空图片、视频、文档 UI（不清文字）"""
         for i in reversed(range(self._img_grid.count())):
             item = self._img_grid.itemAt(i)
             if item and item.widget() and isinstance(item.widget(), _ThumbCard):
@@ -602,6 +832,12 @@ class TaskDetailPanel(QDialog):
                 item.widget().deleteLater()
                 self._vid_list_layout.removeItem(item)
 
+        for i in reversed(range(self._doc_list_layout.count())):
+            item = self._doc_list_layout.itemAt(i)
+            if item and item.widget() and isinstance(item.widget(), _DocRow):
+                item.widget().deleteLater()
+                self._doc_list_layout.removeItem(item)
+
     # ------------------------------------------------------------------ #
     #  拖拽文件到窗口
     # ------------------------------------------------------------------ #
@@ -613,11 +849,28 @@ class TaskDetailPanel(QDialog):
     def dropEvent(self, event: QDropEvent) -> None:
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            ext = Path(path).suffix.lower()
-            if ext in IMAGE_EXTS:
-                self._add_image_file(path)
-            elif ext in VIDEO_EXTS:
-                self._add_video_file(path)
+            if path:
+                ext = Path(path).suffix.lower()
+                if ext in IMAGE_EXTS:
+                    self._add_image_file(path)
+                elif ext in VIDEO_EXTS:
+                    self._add_video_file(path)
+                elif ext in DOC_EXTS:
+                    try:
+                        note = self._note_repo.add_doc_file(self._task.id, path)
+                        self._add_doc_row(note)
+                    except Exception as e:
+                        QMessageBox.warning(self, "添加失败", str(e))
+            else:
+                # 拖入的是网络 URL
+                link = url.toString()
+                if link.startswith("http"):
+                    try:
+                        note = self._note_repo.add_link(self._task.id, link)
+                        self._add_doc_row(note)
+                        self._show_link_hint("✓ 链接已添加", success=True)
+                    except Exception as e:
+                        QMessageBox.warning(self, "添加失败", str(e))
 
     # ------------------------------------------------------------------ #
     #  鼠标拖拽（弹窗可移动）

@@ -29,8 +29,8 @@ def get_attachments_dir() -> Path:
 @dataclass
 class TaskNote:
     task_id: int
-    note_type: str          # 'text' | 'image' | 'video'
-    content: Optional[str] = None   # 文字内容 或 文件路径（绝对）
+    note_type: str          # 'text' | 'image' | 'video' | 'link' | 'file'
+    content: Optional[str] = None   # 文字/URL 或 文件路径（绝对）
     file_name: Optional[str] = None
     file_size: Optional[int] = None
     created_at: str = field(
@@ -51,11 +51,20 @@ class TaskNote:
         return self.note_type == "video"
 
     @property
+    def is_link(self) -> bool:
+        return self.note_type == "link"
+
+    @property
+    def is_doc_file(self) -> bool:
+        """本地文档文件（非图片/视频）"""
+        return self.note_type == "file"
+
+    @property
     def display_name(self) -> str:
         if self.is_text:
             txt = (self.content or "").strip()
             return txt[:40] + "…" if len(txt) > 40 else txt
-        return self.file_name or "附件"
+        return self.file_name or self.content or "附件"
 
 
 class TaskNoteRepository:
@@ -68,6 +77,34 @@ class TaskNoteRepository:
     def add_text(self, task_id: int, text: str) -> TaskNote:
         """添加文字笔记"""
         note = TaskNote(task_id=task_id, note_type="text", content=text)
+        return self._insert(note)
+
+    def add_link(self, task_id: int, url: str, title: str = "") -> TaskNote:
+        """添加 URL 链接（企业微信/飞书/Notion/任意网址）"""
+        note = TaskNote(
+            task_id=task_id,
+            note_type="link",
+            content=url.strip(),
+            file_name=title.strip() or url.strip(),
+        )
+        return self._insert(note)
+
+    def add_doc_file(self, task_id: int, src_path: str) -> TaskNote:
+        """添加本地文档文件（PDF/Word/Excel/PPT/TXT等），复制到附件目录"""
+        src = Path(src_path)
+        if not src.exists():
+            raise FileNotFoundError(f"文件不存在: {src_path}")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        dest_name = f"t{task_id}_{ts}{src.suffix.lower()}"
+        dest = get_attachments_dir() / dest_name
+        shutil.copy2(src, dest)
+        note = TaskNote(
+            task_id=task_id,
+            note_type="file",
+            content=str(dest),
+            file_name=src.name,
+            file_size=dest.stat().st_size,
+        )
         return self._insert(note)
 
     def add_file(self, task_id: int, src_path: str, note_type: str = "image") -> TaskNote:
