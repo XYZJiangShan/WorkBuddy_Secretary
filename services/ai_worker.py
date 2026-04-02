@@ -3,10 +3,11 @@ ai_worker.py - AI 异步工作线程
 
 将 AIService 的同步阻塞调用包装进 QThread，避免 AI 网络请求卡住 Qt UI 主线程。
 
-支持三种任务类型（task_type）：
+支持四种任务类型（task_type）：
   - "parse_task"       : 自然语言 → 结构化任务
   - "reminder_texts"   : 批量生成提醒文案
   - "daily_review"     : 今日复盘报告
+  - "weekly_report"    : 周报整理
 
 使用方式（主线程中）：
     worker = AIWorker(ai_service)
@@ -37,6 +38,7 @@ class AIWorker(QThread):
             - task_type == "parse_task"     → result: dict
             - task_type == "reminder_texts" → result: list[str]
             - task_type == "daily_review"   → result: str
+            - task_type == "weekly_report"  → result: str
 
         error_occurred(task_type: str, error_message: str)
             AI 调用失败时发射，携带任务类型和错误信息
@@ -79,6 +81,12 @@ class AIWorker(QThread):
         self._kwargs = {"done_tasks": done_tasks, "undone_tasks": undone_tasks}
         return self
 
+    def generate_weekly_report(self, week_summary: dict) -> "AIWorker":
+        """配置为"周报整理"模式"""
+        self._task_type = "weekly_report"
+        self._kwargs = {"week_summary": week_summary}
+        return self
+
     # ------------------------------------------------------------------ #
     #  QThread 入口
     # ------------------------------------------------------------------ #
@@ -102,6 +110,9 @@ class AIWorker(QThread):
 
             elif task_type == "daily_review":
                 result = self._service.generate_daily_review(**self._kwargs)
+
+            elif task_type == "weekly_report":
+                result = self._service.generate_weekly_report(**self._kwargs)
 
             else:
                 raise ValueError(f"未知的 AI 任务类型: {task_type!r}")
@@ -132,7 +143,7 @@ def run_ai_task(
 
     Args:
         service:   AIService 实例
-        task_type: "parse_task" | "reminder_texts" | "daily_review"
+        task_type: "parse_task" | "reminder_texts" | "daily_review" | "weekly_report"
         on_result: result_ready 的槽函数 (task_type: str, result: object) -> None
         on_error:  error_occurred 的槽函数（可选）
         parent:    Qt 父对象
@@ -152,6 +163,8 @@ def run_ai_task(
             kwargs.get("done_tasks", []),
             kwargs.get("undone_tasks", []),
         )
+    elif task_type == "weekly_report":
+        worker.generate_weekly_report(kwargs.get("week_summary", {}))
 
     worker.result_ready.connect(on_result)
     if on_error:

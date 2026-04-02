@@ -2,10 +2,11 @@
 ai_service.py - AI 服务核心层
 
 封装所有 AI 调用，基于 OpenAI 兼容接口（支持 DeepSeek / 通义 / GPT）。
-提供三个核心方法：
-  1. parse_task()        - 自然语言 → 结构化任务
+提供四个核心方法：
+  1. parse_task()              - 自然语言 → 结构化任务
   2. generate_reminder_texts() - 批量生成休息提醒文案
   3. generate_daily_review()   - 今日任务复盘报告
+  4. generate_weekly_report()  - 周报整理报告
 
 设计原则：
 - 统一的超时与重试处理，AI 不可用时优雅降级
@@ -279,6 +280,80 @@ class AIService:
             logger.error("generate_daily_review 失败: %s", e)
             return _local_review(today, done_tasks, undone_tasks) + f"\n\n> ⚠️ AI 服务暂时不可用（{e}），以上为本地统计报告。"
 
+    # ------------------------------------------------------------------ #
+    #  接口 4：周报整理
+    # ------------------------------------------------------------------ #
+
+    def generate_weekly_report(self, week_summary: dict) -> str:
+        """
+        根据一周任务数据生成周报。
+
+        Args:
+            week_summary: TaskRepository.get_week_summary() 返回的字典
+
+        Returns:
+            Markdown 格式的周报字符串；
+            API Key 未配置或调用失败时返回简要本地周报
+        """
+        start = week_summary["start"]
+        end = week_summary["end"]
+        total = week_summary["total"]
+        done = week_summary["done"]
+        undone = week_summary["undone"]
+        by_day = week_summary["by_day"]
+        by_priority = week_summary["by_priority"]
+
+        if not self.is_configured():
+            return _local_weekly_report(week_summary)
+
+        # 构造每日明细文本
+        daily_detail_lines = []
+        for day, tasks_map in by_day.items():
+            done_titles = [t.title for t in tasks_map["done"]]
+            undone_titles = [t.title for t in tasks_map["undone"]]
+            daily_detail_lines.append(f"📅 {day}:")
+            if done_titles:
+                daily_detail_lines.append(f"  ✅ 已完成: {', '.join(done_titles)}")
+            if undone_titles:
+                daily_detail_lines.append(f"  ❌ 未完成: {', '.join(undone_titles)}")
+            if not done_titles and not undone_titles:
+                daily_detail_lines.append("  （无任务记录）")
+        daily_detail = "\n".join(daily_detail_lines) or "（本周无任务记录）"
+
+        prompt = f"""你是一位专业又温暖的工作效率顾问。请根据以下一周任务数据，生成一份有价值的周报。
+
+周报期间：{start} ~ {end}
+任务统计：总计 {total} 项，已完成 {done} 项，未完成 {undone} 项
+完成率：{(done / total * 100):.0f}% （{'excellent' if done/max(total,1) >= 0.8 else 'needs improvement'}）
+优先级分布：高 {by_priority.get('high',0)} 项 / 中 {by_priority.get('medium',0)} 项 / 低 {by_priority.get('low',0)} 项
+
+每日明细：
+{daily_detail}
+
+周报要求：
+1. 开头用一句话总结本周整体表现
+2. 分析工作节奏（哪几天产出高/低，是否有规律）
+3. 重点成果：本周完成的重要任务（如有高优先级）
+4. 待关注事项：未完成的重要任务 + 建议
+5. 下周展望：基于本周情况给 2-3 条改进建议
+6. 结尾用一句温暖鼓励的话
+
+格式：使用 Markdown（## 标题，- 列表），控制在 400 字以内，语气真诚专业。"""
+
+        model = self._settings.get("ai_model", "deepseek-chat")
+        try:
+            client = self._get_client()
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1000,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error("generate_weekly_report 失败: %s", e)
+            return _local_weekly_report(week_summary) + f"\n\n> ⚠️ AI 服务暂时不可用（{e}），以上为本地统计报告。"
+
 
 # --------------------------------------------------------------------------- #
 #  私有工具函数
@@ -337,4 +412,39 @@ def _local_review(today: str, done_tasks: list[dict], undone_tasks: list[dict]) 
         lines.append("")
     lines.append("---")
     lines.append("_提示：配置 AI API Key 可获得更丰富的复盘分析 ✨_")
+    return "\n".join(lines)
+
+
+def _local_weekly_report(week_summary: dict) -> str:
+    """本地生成简要周报（无 AI 时使用）"""
+    start = week_summary["start"]
+    end = week_summary["end"]
+    total = week_summary["total"]
+    done = week_summary["done"]
+    undone = week_summary["undone"]
+    by_day = week_summary["by_day"]
+    by_priority = week_summary["by_priority"]
+    rate = (done / max(total, 1) * 100)
+
+    lines = [
+        f"## 📋 周报（{start} ~ {end}）",
+        "",
+        f"**📊 任务统计**：总计 {total} 项 | ✅ 已完成 {done} 项 | ❌ 未完成 {undone} 项 | 完成率 {rate:.0f}%",
+        "",
+        f"**🎯 优先级分布**：🔴 高 {by_priority.get('high', 0)} | 🟡 中 {by_priority.get('medium', 0)} | 🟢 低 {by_priority.get('low', 0)}",
+        "",
+    ]
+
+    if by_day:
+        lines.append("### 每日明细")
+        for day, tasks_map in by_day.items():
+            done_titles = [t.title for t in tasks_map["done"]]
+            undone_titles = [t.title for t in tasks_map["undone"]]
+            done_str = ", ".join(done_titles) if done_titles else "无"
+            undone_str = ", ".join(undone_titles) if undone_titles else "无"
+            lines.append(f"- **{day}**：✅ {done_str}　❌ {undone_str}")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("_提示：配置 AI API Key 可获得更深入的周报分析 ✨_")
     return "\n".join(lines)

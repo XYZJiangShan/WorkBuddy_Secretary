@@ -226,3 +226,67 @@ class TaskRepository:
             day = task.created_at[:10]  # "YYYY-MM-DD"
             result.setdefault(day, []).append(task)
         return result
+
+    def get_week_summary(self, end_date: date | None = None) -> dict:
+        """
+        获取最近一周的任务统计，用于周报生成。
+
+        Args:
+            end_date: 周报截止日期（默认今天）
+
+        Returns:
+            {
+                "start": "YYYY-MM-DD",
+                "end": "YYYY-MM-DD",
+                "total": int,
+                "done": int,
+                "undone": int,
+                "by_day": {
+                    "YYYY-MM-DD": {"done": [Task, ...], "undone": [Task, ...]},
+                    ...
+                },
+                "by_priority": {"high": int, "medium": int, "low": int},
+            }
+        """
+        from datetime import timedelta
+        end_d = end_date or date.today()
+        start_d = end_d - timedelta(days=6)  # 最近 7 天
+        start_str = start_d.isoformat()
+        end_str = end_d.isoformat()
+
+        conn = get_conn()
+        rows = conn.execute(
+            """
+            SELECT * FROM tasks
+            WHERE DATE(created_at) BETWEEN ? AND ?
+               OR (done=0 AND DATE(created_at) < ?)
+            ORDER BY created_at DESC
+            """,
+            (start_str, end_str, start_str),
+        ).fetchall()
+
+        tasks = [Task.from_row(r) for r in rows]
+        by_day: dict[str, dict[str, list]] = {}
+        by_priority = {"high": 0, "medium": 0, "low": 0}
+        done_count = 0
+
+        for t in tasks:
+            day = t.created_at[:10]
+            if day not in by_day:
+                by_day[day] = {"done": [], "undone": []}
+            if t.done:
+                by_day[day]["done"].append(t)
+                done_count += 1
+            else:
+                by_day[day]["undone"].append(t)
+            by_priority[t.priority] = by_priority.get(t.priority, 0) + 1
+
+        return {
+            "start": start_str,
+            "end": end_str,
+            "total": len(tasks),
+            "done": done_count,
+            "undone": len(tasks) - done_count,
+            "by_day": dict(sorted(by_day.items())),
+            "by_priority": by_priority,
+        }

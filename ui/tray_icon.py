@@ -67,6 +67,7 @@ class TrayIcon(QSystemTrayIcon):
     show_window = pyqtSignal()
     hide_window = pyqtSignal()
     open_settings = pyqtSignal()
+    open_weekly_report = pyqtSignal()
     trigger_reminder = pyqtSignal()
     quit_app = pyqtSignal()
 
@@ -117,6 +118,10 @@ class TrayIcon(QSystemTrayIcon):
         settings_action = QAction("⚙️  设置", menu)
         settings_action.triggered.connect(self.open_settings)
         menu.addAction(settings_action)
+
+        weekly_action = QAction("📝  周报", menu)
+        weekly_action.triggered.connect(self.open_weekly_report)
+        menu.addAction(weekly_action)
 
         remind_action = QAction("🔔  立即提醒", menu)
         remind_action.triggered.connect(self.trigger_reminder)

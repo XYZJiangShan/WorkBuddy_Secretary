@@ -56,6 +56,7 @@ class FloatingWindow(QWidget):
 
     open_settings = pyqtSignal()
     open_review = pyqtSignal()
+    open_weekly_report = pyqtSignal()
 
     def __init__(
         self,
@@ -217,6 +218,7 @@ class FloatingWindow(QWidget):
         self._pomodoro_btn = self._make_icon_btn("🍅", "番茄钟专注模式")
         self._stats_btn = self._make_icon_btn("📊", "今日统计")
         self._history_btn = self._make_icon_btn("📋", "历史任务记录")
+        self._weekly_btn = self._make_icon_btn("📝", "周报")
         self._settings_btn = self._make_icon_btn("⚙", "打开设置")
         self._close_btn = self._make_icon_btn("✕", "最小化到托盘")
         self._close_btn.setStyleSheet("""
@@ -229,7 +231,7 @@ class FloatingWindow(QWidget):
         """)
 
         for btn in [self._pomodoro_btn, self._stats_btn, self._history_btn,
-                    self._settings_btn]:
+                    self._weekly_btn, self._settings_btn]:
             row.addWidget(btn)
         row.addWidget(self._close_btn)
 
@@ -260,6 +262,7 @@ class FloatingWindow(QWidget):
         self._pomodoro_btn.clicked.connect(self._toggle_pomodoro)
         self._stats_btn.clicked.connect(self._toggle_stats)
         self._history_btn.clicked.connect(self._open_history)
+        self._weekly_btn.clicked.connect(self.open_weekly_report)
 
         # 横幅
         self._banner.closed.connect(self._on_banner_closed)
@@ -364,7 +367,7 @@ class FloatingWindow(QWidget):
             QPushButton:hover {{ background: rgba(108,99,255,0.15); color: {theme.accent}; }}
         """
         for btn in [self._pomodoro_btn, self._stats_btn, self._history_btn,
-                    self._settings_btn]:
+                    self._weekly_btn, self._settings_btn]:
             btn.setStyleSheet(btn_style)
         self._close_btn.setStyleSheet(f"""
             QPushButton {{
