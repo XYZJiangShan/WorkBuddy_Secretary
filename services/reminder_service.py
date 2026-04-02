@@ -228,6 +228,24 @@ class ReminderService(QObject):
         random.shuffle(fallback)
         return fallback[0]
 
+    def wait_ai_idle(self, timeout_ms: int = 8000) -> None:
+        """等待 AI 子线程空闲（用于打开 QDialog 前避免 COM 冲突 0x8001010d）。
+
+        在主线程弹出 QDialog.exec() 之前必须调用此方法。
+        子线程里 openai/httpx 的 SSL read() 与 Qt 模态对话框的 COM 初始化模式
+        冲突，会导致 Windows 致命异常 0x8001010d (RPC_E_WRONG_THREAD)。
+        """
+        worker = self._cache_worker
+        if worker is not None and worker.isRunning():
+            logger.info("等待 AI 子线程完成（最多 %d ms）…", timeout_ms)
+            finished = worker.wait(timeout_ms)
+            if not finished:
+                logger.warning("AI 子线程超时，强制终止")
+                worker.terminate()
+                worker.wait(2000)
+            self._cache_worker = None
+            logger.info("AI 子线程已安全退出")
+
     def _refill_cache_async(self) -> None:
         """异步向 AI 请求新一批提醒文案，填充缓存池"""
         if self._cache_worker and self._cache_worker.isRunning():

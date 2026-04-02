@@ -86,6 +86,8 @@ class SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # 设置焦点策略，避免滚动区域拦截 QComboBox 事件
+        scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         scroll.setStyleSheet("""
             QScrollArea { border: none; background: transparent; }
             QScrollBar:vertical { width: 4px; background: transparent; }
@@ -131,6 +133,11 @@ class SettingsDialog(QDialog):
             "vertex_ai/gemini-3.1-flash-image-preview",
             "deepseek-chat",
         ])
+        # 确保下拉列表能正确弹出和交互
+        self._model_combo.setMaxVisibleItems(8)  # 限制显示的项目数
+        # 设置焦点策略，确保能接收鼠标事件
+        self._model_combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._model_combo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self._model_combo.setStyleSheet("""
             QComboBox {
                 background: rgba(40,36,62,0.8);
@@ -138,9 +145,14 @@ class SettingsDialog(QDialog):
                 border-radius: 6px; padding: 4px 8px;
                 color: #E8E5FF; font-size: 11px;
             }
+            QComboBox:hover {
+                border: 1px solid rgba(139,133,255,0.4);
+            }
             QComboBox:focus { border: 1px solid #8B85FF; }
             QComboBox::drop-down {
                 border: none; width: 20px;
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
             }
             QComboBox::down-arrow {
                 image: none;
@@ -155,6 +167,17 @@ class SettingsDialog(QDialog):
                 border: 1px solid rgba(139,133,255,0.3);
                 selection-background-color: rgba(139,133,255,0.3);
                 outline: none;
+                padding: 2px;
+            }
+            QComboBox QAbstractItemView::item {
+                height: 24px;
+                padding: 2px 8px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background: rgba(139,133,255,0.2);
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background: rgba(139,133,255,0.4);
             }
         """)
         self._model_combo.setFont(QFont("Microsoft YaHei", 10))

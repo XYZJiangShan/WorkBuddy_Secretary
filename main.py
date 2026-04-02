@@ -169,7 +169,7 @@ def main() -> int:
                                pomodoro_service, hotkey_service, sync_service, main_window)
     )
     main_window.open_review.connect(
-        lambda: _open_review(ai_service, task_repo, settings, main_window)
+        lambda: _open_review(ai_service, task_repo, settings, reminder_service, main_window)
     )
     tray.open_settings.connect(
         lambda: _open_settings(settings, ai_service, reminder_service,
@@ -201,8 +201,16 @@ def main() -> int:
 def _open_settings(settings, ai_service, reminder_service,
                    pomodoro_service, hotkey_service, sync_service, parent,
                    first_run: bool = False):
+    # ⚠️ 必须在 QDialog.exec() 之前等待 AI 子线程完成！
+    # 子线程 openai/httpx 的 SSL read() 与 Qt 模态对话框 COM 初始化冲突
+    # → Windows fatal exception 0x8001010d (RPC_E_WRONG_THREAD)
+    reminder_service.wait_ai_idle()
+
     from ui.settings_dialog import SettingsDialog
-    dialog = SettingsDialog(settings, parent=parent)
+    # ⚠️ parent 必须为 None！
+    # FloatingWindow 有 WA_TranslucentBackground + WindowStaysOnTopHint，
+    # 子 QDialog 继承这些属性后 exec() 会触发 COM 冲突崩溃。
+    dialog = SettingsDialog(settings, parent=None)
 
     def on_saved():
         ai_service.reset()
@@ -236,9 +244,12 @@ def _open_settings(settings, ai_service, reminder_service,
     dialog.exec()
 
 
-def _open_review(ai_service, task_repo, settings, parent):
+def _open_review(ai_service, task_repo, settings, reminder_service, parent):
+    # ⚠️ 必须在 QDialog.exec() 之前等待 AI 子线程完成，避免 COM 冲突崩溃
+    reminder_service.wait_ai_idle()
     from ui.review_dialog import ReviewDialog
-    dialog = ReviewDialog(ai_service, task_repo, settings, parent=parent)
+    # parent=None 避免继承 FloatingWindow 的 WA_TranslucentBackground 导致 COM 崩溃
+    dialog = ReviewDialog(ai_service, task_repo, settings, parent=None)
     dialog.exec()
 
 
