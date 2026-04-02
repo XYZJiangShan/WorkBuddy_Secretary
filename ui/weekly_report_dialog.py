@@ -48,7 +48,8 @@ class WeeklyReportDialog(QDialog):
         self._end_date: date = date.today()
 
         self._setup_ui()
-        self._start_report()
+        # 延迟启动 AI 生成（等 exec() 进入事件循环后再开始，避免 COM 冲突）
+        QTimer.singleShot(300, self._start_report)
 
     # ------------------------------------------------------------------ #
     #  UI 搭建
@@ -58,22 +59,21 @@ class WeeklyReportDialog(QDialog):
         self.setWindowTitle("周报")
         self.setFixedWidth(520)
         self.setMaximumHeight(680)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # ⚠️ 不在 __init__ 设 WindowStaysOnTopHint（Bug #9），
+        #    不用 FramelessWindowHint + WA_TranslucentBackground（与 AI 子线程 COM 冲突）
+        self.setWindowFlags(Qt.WindowType.Dialog)
+        # 延迟 200ms 再设置置顶，避免 COM 冲突崩溃
+        QTimer.singleShot(200, self._apply_stay_on_top)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
+        root.setContentsMargins(0, 0, 0, 0)
 
-        # ---- 卡片容器 ----
+        # ---- 卡片容器（不再依赖 WA_TranslucentBackground，直接做圆角卡片）----
         card = QWidget()
         card.setObjectName("WeeklyCard")
         card.setStyleSheet("""
             #WeeklyCard {
-                background: rgba(254, 252, 247, 0.97);
+                background: #FEFCF7;
                 border-radius: 16px;
                 border: 1px solid rgba(108, 99, 255, 0.18);
             }
@@ -209,6 +209,11 @@ class WeeklyReportDialog(QDialog):
         card_layout.addLayout(btn_row)
 
         root.addWidget(card)
+
+    def _apply_stay_on_top(self) -> None:
+        """延迟设置 WindowStaysOnTopHint，避免 COM 冲突"""
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.show()
 
     @staticmethod
     def _nav_btn_style() -> str:
