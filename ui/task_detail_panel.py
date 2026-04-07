@@ -267,9 +267,12 @@ class ImagePreviewDialog(QDialog):
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle("图片预览")
-        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
+        # ⚠️ Bug #9：不在 __init__ 直接设 WindowStaysOnTopHint
+        self.setWindowFlags(Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.resize(900, 680)
+        # 延迟 200ms 设置置顶
+        QTimer.singleShot(200, self._apply_stay_on_top)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -311,6 +314,11 @@ class ImagePreviewDialog(QDialog):
     def keyPressEvent(self, e):
         if e.key() == Qt.Key.Key_Escape:
             self.close()
+
+    def _apply_stay_on_top(self) -> None:
+        """延迟设置 WindowStaysOnTopHint，避免 COM 冲突（Bug #9）"""
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.show()
 
 
 # --------------------------------------------------------------------------- #
@@ -414,16 +422,25 @@ class TaskDetailPanel(QDialog):
         self._save_timer.timeout.connect(self._auto_save_text)
 
         self.setWindowTitle(f"任务详情 — {task.title}")
+        # ⚠️ Bug #9：不在 __init__ 直接设 WindowStaysOnTopHint
+        #    FramelessWindowHint 可保留（此面板不需要 WA_TranslucentBackground，风险低）
         self.setWindowFlags(
             Qt.WindowType.Dialog
             | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAcceptDrops(True)
         self.resize(480, 600)
 
         self._setup_ui()
         self._load_notes()
+
+        # 延迟 200ms 设置置顶，避免 COM 冲突崩溃
+        QTimer.singleShot(200, self._apply_stay_on_top)
+
+    def _apply_stay_on_top(self) -> None:
+        """延迟设置 WindowStaysOnTopHint，避免 COM 冲突（Bug #9）"""
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.show()
 
     # ------------------------------------------------------------------ #
     #  UI 搭建

@@ -8,6 +8,7 @@ main.py - 桌面小秘书程序入口 v2
 import logging
 import sys
 import os
+import traceback
 
 os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
 
@@ -27,12 +28,34 @@ from services.hotkey_service import HotkeyService
 from services.sync_service import SyncService
 
 # ---- 日志 ----
+# 日志写到文件 + 控制台，崩溃后可查
+_log_dir = os.path.join(os.environ.get("APPDATA", "."), "DeskSecretary")
+os.makedirs(_log_dir, exist_ok=True)
+_log_file = os.path.join(_log_dir, "desk_secretary.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(_log_file, encoding="utf-8", mode="a"),
+    ],
 )
 logger = logging.getLogger("main")
+
+
+def _global_exception_hook(exc_type, exc_value, exc_tb):
+    """全局未捕获异常钩子：写入日志文件后再崩溃"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    logger.critical(
+        "未捕获异常:\n%s",
+        "".join(traceback.format_exception(exc_type, exc_value, exc_tb)),
+    )
+
+sys.excepthook = _global_exception_hook
 
 
 def main() -> int:
