@@ -59,11 +59,13 @@ class WeeklyReportDialog(QDialog):
         self.setWindowTitle("周报")
         self.setFixedWidth(520)
         self.setMaximumHeight(680)
-        # ⚠️ 不在 __init__ 设 WindowStaysOnTopHint（Bug #9），
-        #    不用 FramelessWindowHint + WA_TranslucentBackground（与 AI 子线程 COM 冲突）
-        self.setWindowFlags(Qt.WindowType.Dialog)
-        # 延迟 200ms 再设置置顶，避免 COM 冲突崩溃
-        QTimer.singleShot(200, self._apply_stay_on_top)
+        # wait_ai_idle() 已在调用方（_open_weekly_report）保证 AI 子线程空闲，
+        # 所以这里直接设 WindowStaysOnTopHint 是安全的（无 COM 冲突风险）。
+        # ⚠️ 不能延迟用 setWindowFlag()：它会 destroy+recreate 窗口，
+        #    打断 exec() 的模态事件循环，导致弹窗一闪而过。
+        self.setWindowFlags(
+            Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint
+        )
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -209,11 +211,6 @@ class WeeklyReportDialog(QDialog):
         card_layout.addLayout(btn_row)
 
         root.addWidget(card)
-
-    def _apply_stay_on_top(self) -> None:
-        """延迟设置 WindowStaysOnTopHint，避免 COM 冲突"""
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.show()
 
     @staticmethod
     def _nav_btn_style() -> str:

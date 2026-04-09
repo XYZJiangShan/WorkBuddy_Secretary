@@ -56,12 +56,13 @@ class ReviewDialog(QDialog):
         self.setWindowTitle("今日复盘")
         self.setFixedWidth(480)
         self.setMaximumHeight(600)
-        # ⚠️ 不在 __init__ 设 WindowStaysOnTopHint（Bug #9），
-        #    不用 FramelessWindowHint + WA_TranslucentBackground（与 AI 子线程 COM 冲突）
-        self.setWindowFlags(Qt.WindowType.Dialog)
-        # 延迟 200ms 再设置置顶，避免 COM 冲突崩溃
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(200, self._apply_stay_on_top)
+        # wait_ai_idle() 已在调用方（_open_review）保证 AI 子线程空闲，
+        # 所以这里直接设 WindowStaysOnTopHint 是安全的（无 COM 冲突风险）。
+        # ⚠️ 不能延迟用 setWindowFlag()：它会 destroy+recreate 窗口，
+        #    打断 exec() 的模态事件循环，导致弹窗一闪而过。
+        self.setWindowFlags(
+            Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint
+        )
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -176,11 +177,6 @@ class ReviewDialog(QDialog):
     # ------------------------------------------------------------------ #
     #  AI 生成
     # ------------------------------------------------------------------ #
-
-    def _apply_stay_on_top(self) -> None:
-        """延迟设置 WindowStaysOnTopHint，避免 COM 冲突"""
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.show()
 
     def _start_review(self) -> None:
         done_tasks = [
