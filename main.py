@@ -26,6 +26,7 @@ from services.reminder_service import ReminderService
 from services.pomodoro_service import PomodoroService
 from services.hotkey_service import HotkeyService
 from services.sync_service import SyncService
+from services.auto_report_service import AutoReportService
 
 # ---- 日志 ----
 # 日志写到文件 + 控制台，崩溃后可查
@@ -121,6 +122,7 @@ def main() -> int:
         hotkey=settings.get("hotkey_toggle_window", "alt+space")
     )
     sync_service = SyncService(settings)
+    auto_report_service = AutoReportService(ai_service, task_repo, settings)
 
     # 启动时从 GitHub 拉取（后台，不阻塞 UI）
     def _startup_pull():
@@ -164,6 +166,7 @@ def main() -> int:
     def quit_app():
         hotkey_service.stop()
         reminder_service.stop()
+        auto_report_service.stop()
         sync_service.stop()
         # 退出时推送（同步，最多等 10 秒）
         if sync_service.is_enabled():
@@ -212,6 +215,14 @@ def main() -> int:
     main_window.raise_()
     reminder_service.start()
     sync_service.start()   # 启动定时同步
+    # 延迟启动自动日报（等 AI 客户端和事件循环都稳定后）
+    QTimer.singleShot(5000, auto_report_service.start)
+    auto_report_service.daily_report_generated.connect(
+        lambda d: tray.notify("📊 日报已自动生成", f"{d} 的日报已保存，可在历史记录中查看")
+    )
+    auto_report_service.weekly_report_generated.connect(
+        lambda d: tray.notify("📋 周报已自动生成", f"本周周报已保存，可在历史记录中查看")
+    )
 
     if settings.get_bool("hotkey_enabled", True):
         hotkey_service.start()

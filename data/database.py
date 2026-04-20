@@ -90,6 +90,18 @@ class Database:
                 file_size   INTEGER,         -- 字节数（image/video）
                 created_at  TEXT    NOT NULL
             );
+
+            -- 日报/周报存档（定时自动生成 + 手动生成均存入此表）
+            CREATE TABLE IF NOT EXISTS reports (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                report_type TEXT    NOT NULL,  -- 'daily' | 'weekly'
+                report_date TEXT    NOT NULL,  -- 日报: 'YYYY-MM-DD', 周报: 'YYYY-MM-DD~YYYY-MM-DD'
+                content     TEXT    NOT NULL,  -- Markdown 格式报告正文
+                auto_generated INTEGER NOT NULL DEFAULT 0,  -- 1=定时自动生成, 0=手动
+                created_at  TEXT    NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_type_date
+                ON reports(report_type, report_date);
             """
         )
         conn.commit()

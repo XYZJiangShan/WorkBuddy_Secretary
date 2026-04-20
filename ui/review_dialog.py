@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 
 from data.settings_repository import SettingsRepository
 from data.task_repository import TaskRepository
+from data.report_repository import ReportRepository, Report
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
 
@@ -40,6 +41,7 @@ class ReviewDialog(QDialog):
         self._ai = ai_service
         self._task_repo = task_repo
         self._settings = settings
+        self._report_repo = ReportRepository()
         self._worker: AIWorker | None = None
         self._report_text: str = ""
 
@@ -202,6 +204,14 @@ class ReviewDialog(QDialog):
         self._report_text = text
         self._content_browser.setMarkdown(text)
         self._copy_btn.setEnabled(True)
+        # 自动保存到 reports 表
+        from datetime import date as _date
+        self._report_repo.save_report(Report(
+            report_type="daily",
+            report_date=_date.today().isoformat(),
+            content=text,
+            auto_generated=False,
+        ))
 
     def _on_review_error(self, task_type: str, error_msg: str) -> None:
         if task_type != "daily_review":

@@ -249,7 +249,7 @@ class AIService:
             for t in undone_tasks
         ) or "（今日所有任务均已完成 🎉）"
 
-        prompt = f"""你是一位温暖又专业的工作复盘助手。请根据以下今日任务数据，生成一份简洁有价值的复盘报告。
+        prompt = f"""你是一位温暖又专业的工作复盘助手。请根据以下今日任务数据，生成一份**分类整理、归纳总结**的复盘报告。
 
 今日日期：{today}
 已完成（{done_count} 项）：
@@ -258,13 +258,14 @@ class AIService:
 未完成（{undone_count} 项）：
 {undone_list}
 
-报告要求：
-1. 先简短肯定今日成果（1~2句）
-2. 分析未完成任务的可能原因（若有，1~3条建议）
-3. 给出明日优先事项提示（2~3条）
-4. 结尾用一句温暖的话鼓励
+报告要求（核心：分类整理 + 归纳）：
+1. **工作分类汇总**：将所有任务按工作类别（如开发、设计、沟通、学习、行政等）分组，每类下列出具体任务和完成状态，并用一句话归纳该类别今日产出
+2. **今日成果亮点**：提炼 1~2 个关键成果，简短肯定
+3. **未完成分析**（若有）：按优先级排序列出未完成任务，简述可能原因和建议
+4. **明日待办建议**：基于今日情况给出 2~3 条优先事项
+5. **一句话鼓励**：结尾温暖收束
 
-格式：使用 Markdown（## 标题，- 列表），控制在 200 字以内，语气真诚不浮夸。"""
+格式：使用 Markdown（## 标题，### 子标题，- 列表），控制在 300 字以内，语气真诚不浮夸。"""
 
         model = self._settings.get("ai_model", "deepseek-chat")
         try:
@@ -273,7 +274,7 @@ class AIService:
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=600,
+                max_tokens=900,
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -320,7 +321,7 @@ class AIService:
                 daily_detail_lines.append("  （无任务记录）")
         daily_detail = "\n".join(daily_detail_lines) or "（本周无任务记录）"
 
-        prompt = f"""你是一位专业又温暖的工作效率顾问。请根据以下一周任务数据，生成一份有价值的周报。
+        prompt = f"""你是一位专业又温暖的工作效率顾问。请根据以下一周任务数据，生成一份**分类整理、归纳总结**的周报。
 
 周报期间：{start} ~ {end}
 任务统计：总计 {total} 项，已完成 {done} 项，未完成 {undone} 项
@@ -330,15 +331,16 @@ class AIService:
 每日明细：
 {daily_detail}
 
-周报要求：
-1. 开头用一句话总结本周整体表现
-2. 分析工作节奏（哪几天产出高/低，是否有规律）
-3. 重点成果：本周完成的重要任务（如有高优先级）
-4. 待关注事项：未完成的重要任务 + 建议
-5. 下周展望：基于本周情况给 2-3 条改进建议
-6. 结尾用一句温暖鼓励的话
+周报要求（核心：分类整理 + 归纳总结）：
+1. **本周总览**：一句话总结本周整体表现和完成率
+2. **工作分类汇总**：将本周所有任务按工作类别（如开发、设计、沟通、学习、行政等）分组，每类列出任务清单和完成情况，附一句归纳
+3. **节奏分析**：分析工作节奏（哪几天产出高/低），是否有规律
+4. **重点成果**：提炼本周 2~3 个关键成果（优先高优先级任务）
+5. **待关注事项**：未完成的重要任务 + 跟进建议
+6. **下周展望**：基于本周情况给 2~3 条改进建议
+7. **一句话鼓励**：结尾温暖收束
 
-格式：使用 Markdown（## 标题，- 列表），控制在 400 字以内，语气真诚专业。"""
+格式：使用 Markdown（## 标题，### 子标题，- 列表），控制在 500 字以内，语气真诚专业。"""
 
         model = self._settings.get("ai_model", "deepseek-chat")
         try:
@@ -390,7 +392,7 @@ def _sample_fallback(count: int) -> list[str]:
 
 
 def _local_review(today: str, done_tasks: list[dict], undone_tasks: list[dict]) -> str:
-    """本地生成简要复盘报告（无 AI 时使用）"""
+    """本地生成分类整理的复盘报告（无 AI 时使用）"""
     done_count = len(done_tasks)
     undone_count = len(undone_tasks)
     lines = [
@@ -399,24 +401,33 @@ def _local_review(today: str, done_tasks: list[dict], undone_tasks: list[dict]) 
         f"**✅ 已完成：{done_count} 项　❌ 未完成：{undone_count} 项**",
         "",
     ]
+    # 按优先级分组
     if done_tasks:
-        lines.append("### 完成的任务")
+        lines.append("### 工作完成情况")
+        by_prio = {"high": [], "medium": [], "low": []}
         for t in done_tasks:
-            lines.append(f"- {t['title']}")
+            p = t.get("priority", "medium")
+            by_prio.setdefault(p, []).append(t["title"])
+        prio_labels = {"high": "🔴 高优先级", "medium": "🟡 中优先级", "low": "🟢 低优先级"}
+        for p in ["high", "medium", "low"]:
+            if by_prio.get(p):
+                lines.append(f"**{prio_labels[p]}**")
+                for title in by_prio[p]:
+                    lines.append(f"- ✅ {title}")
         lines.append("")
     if undone_tasks:
-        lines.append("### 未完成的任务")
+        lines.append("### 待跟进任务")
         for t in undone_tasks:
             suffix = f"（截止：{t['due_time']}）" if t.get("due_time") else ""
-            lines.append(f"- {t['title']}{suffix}")
+            lines.append(f"- ❌ {t['title']}{suffix}")
         lines.append("")
     lines.append("---")
-    lines.append("_提示：配置 AI API Key 可获得更丰富的复盘分析 ✨_")
+    lines.append("_提示：配置 AI API Key 可获得更丰富的分类整理分析 ✨_")
     return "\n".join(lines)
 
 
 def _local_weekly_report(week_summary: dict) -> str:
-    """本地生成简要周报（无 AI 时使用）"""
+    """本地生成分类整理的周报（无 AI 时使用）"""
     start = week_summary["start"]
     end = week_summary["end"]
     total = week_summary["total"]
@@ -429,15 +440,43 @@ def _local_weekly_report(week_summary: dict) -> str:
     lines = [
         f"## 📋 周报（{start} ~ {end}）",
         "",
+        f"### 本周总览",
         f"**📊 任务统计**：总计 {total} 项 | ✅ 已完成 {done} 项 | ❌ 未完成 {undone} 项 | 完成率 {rate:.0f}%",
         "",
         f"**🎯 优先级分布**：🔴 高 {by_priority.get('high', 0)} | 🟡 中 {by_priority.get('medium', 0)} | 🟢 低 {by_priority.get('low', 0)}",
         "",
     ]
 
+    # 按类别汇总（本地降级只能按优先级分组）
+    all_done = []
+    all_undone = []
+    if by_day:
+        for day, tasks_map in by_day.items():
+            all_done.extend(tasks_map["done"])
+            all_undone.extend(tasks_map["undone"])
+
+    if all_done:
+        lines.append("### 已完成任务")
+        prio_groups = {"high": [], "medium": [], "low": []}
+        for t in all_done:
+            prio_groups.setdefault(t.priority, []).append(t.title)
+        prio_labels = {"high": "🔴 高优先级", "medium": "🟡 中优先级", "low": "🟢 低优先级"}
+        for p in ["high", "medium", "low"]:
+            if prio_groups.get(p):
+                lines.append(f"**{prio_labels[p]}**")
+                for title in prio_groups[p]:
+                    lines.append(f"- ✅ {title}")
+        lines.append("")
+
+    if all_undone:
+        lines.append("### 待跟进任务")
+        for t in all_undone:
+            lines.append(f"- ❌ {t.title}")
+        lines.append("")
+
     if by_day:
         lines.append("### 每日明细")
-        for day, tasks_map in by_day.items():
+        for day, tasks_map in sorted(by_day.items()):
             done_titles = [t.title for t in tasks_map["done"]]
             undone_titles = [t.title for t in tasks_map["undone"]]
             done_str = ", ".join(done_titles) if done_titles else "无"
@@ -446,5 +485,5 @@ def _local_weekly_report(week_summary: dict) -> str:
         lines.append("")
 
     lines.append("---")
-    lines.append("_提示：配置 AI API Key 可获得更深入的周报分析 ✨_")
+    lines.append("_提示：配置 AI API Key 可获得更深入的分类分析周报 ✨_")
     return "\n".join(lines)
