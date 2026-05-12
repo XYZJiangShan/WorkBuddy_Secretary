@@ -587,7 +587,7 @@ class TaskListWidget(QWidget):
         input_row.setSpacing(6)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("用自然语言输入任务，回车 AI 解析…")
+        self._input.setPlaceholderText("输入任务，回车添加…")
         self._input.setFont(QFont("Microsoft YaHei", 10))
         self._input.setStyleSheet("""
             QLineEdit {
@@ -632,17 +632,15 @@ class TaskListWidget(QWidget):
 
     def set_ai_mode(self, enabled: bool) -> None:
         """
-        切换 AI 模式。
-        enabled=True  → 输入框触发 AI 解析，显示复盘按钮
-        enabled=False → 输入框直接添加任务，隐藏复盘按钮和 AI 相关 UI
+        切换 AI 模式（仅影响复盘/AI 文案等功能，输入框始终直接添加任务）。
+        enabled=True  → 显示复盘按钮
+        enabled=False → 隐藏复盘按钮和 AI 相关 UI
         """
         self._ai_mode = enabled
         if enabled:
-            self._input.setPlaceholderText("用自然语言输入任务，回车 AI 解析…")
             self._review_btn.show()
             self._loading_label.hide()
         else:
-            self._input.setPlaceholderText("输入任务名称，回车快速添加…")
             self._review_btn.hide()
             self._loading_label.hide()
             self._parse_card.hide()
@@ -729,13 +727,8 @@ class TaskListWidget(QWidget):
         if not text:
             return
         self._input.clear()
-
-        if not self._ai_mode:
-            # 纯本地模式：直接以文本作为任务标题，无需 AI 解析
-            self.task_confirmed.emit({"title": text, "priority": "medium", "due_time": None})
-        else:
-            self.show_ai_loading(True)
-            self.task_add_requested.emit(text)
+        # 直接以输入文本作为任务标题添加，不经 AI 解析
+        self.task_confirmed.emit({"title": text, "priority": "medium", "due_time": None})
 
     def _on_parse_cancelled(self) -> None:
         self._input.setFocus()
