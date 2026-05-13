@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 from data.settings_repository import SettingsRepository
 from data.task_repository import TaskRepository
+from data.task_note_repository import TaskNoteRepository
 from data.report_repository import ReportRepository, Report
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
@@ -43,6 +44,7 @@ class WeeklyReportDialog(QDialog):
         self._task_repo = task_repo
         self._settings = settings
         self._report_repo = ReportRepository()
+        self._note_repo = TaskNoteRepository()
         self._worker: AIWorker | None = None
         self._report_text: str = ""
 
@@ -265,6 +267,29 @@ class WeeklyReportDialog(QDialog):
             self._content_browser.setMarkdown(self._report_text)
             self._copy_btn.setEnabled(True)
             return
+
+        # v2：为周报补充 enriched 信息（笔记摘要）
+        enriched_lines = []
+        for day, tasks_map in week_summary["by_day"].items():
+            for t in tasks_map["done"] + tasks_map["undone"]:
+                if t.id:
+                    notes = self._note_repo.get_by_task(t.id)
+                    extras = []
+                    for n in notes:
+                        if n.is_text and n.content:
+                            txt = n.content.strip()
+                            if len(txt) > 100:
+                                txt = txt[:100] + "…"
+                            extras.append(f"📝 {txt}")
+                        elif n.is_image and n.file_name:
+                            extras.append(f"🖼 图片: {n.file_name}")
+                        elif n.is_link and n.content:
+                            extras.append(f"🔗 {n.content}")
+                        elif n.is_doc_file and n.file_name:
+                            extras.append(f"📎 {n.file_name}")
+                    if extras:
+                        enriched_lines.append(f"- {t.title}: {'; '.join(extras)}")
+        week_summary["enriched_info"] = "\n".join(enriched_lines)
 
         worker = AIWorker(self._ai, parent=self)
         worker.generate_weekly_report(week_summary)

@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 
 from data.settings_repository import SettingsRepository
 from data.task_repository import TaskRepository
+from data.task_note_repository import TaskNoteRepository
 from data.report_repository import ReportRepository, Report
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
@@ -42,6 +43,7 @@ class ReviewDialog(QDialog):
         self._task_repo = task_repo
         self._settings = settings
         self._report_repo = ReportRepository()
+        self._note_repo = TaskNoteRepository()
         self._worker: AIWorker | None = None
         self._report_text: str = ""
 
@@ -181,21 +183,66 @@ class ReviewDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _start_review(self) -> None:
-        done_tasks = [
-            {"title": t.title, "priority": t.priority, "done_at": t.done_at}
-            for t in self._task_repo.get_today_done()
-        ]
-        undone_tasks = [
-            {"title": t.title, "priority": t.priority, "due_time": t.due_time}
-            for t in self._task_repo.get_today(include_done=False)
-        ]
+        done_tasks = self._enrich_tasks(self._task_repo.get_today_done(), done=True)
+        undone_tasks = self._enrich_tasks(
+            self._task_repo.get_today(include_done=False), done=False
+        )
 
         worker = AIWorker(self._ai, parent=self)
         worker.generate_daily_review(done_tasks, undone_tasks)
         worker.result_ready.connect(self._on_review_ready)
         worker.error_occurred.connect(self._on_review_error)
+        worker.progress_updated.connect(self._on_progress)
         worker.start()
         self._worker = worker
+
+    def _enrich_tasks(self, tasks, done: bool) -> list[dict]:
+        """为每个任务收集 task_notes 信息（文字/图片/链接/文档）"""
+        enriched = []
+        for t in tasks:
+            d = {
+                "title": t.title,
+                "priority": t.priority,
+            }
+            if done:
+                d["done_at"] = t.done_at
+            else:
+                d["due_time"] = t.due_time
+
+            # 收集该任务的所有笔记
+            if t.id:
+                notes = self._note_repo.get_by_task(t.id)
+                text_notes = []
+                image_paths = []
+                links = []
+                files = []
+                for n in notes:
+                    if n.is_text and n.content:
+                        text_notes.append(n.content.strip())
+                    elif n.is_image and n.content:
+                        image_paths.append(n.content)  # 文件绝对路径
+                    elif n.is_link and n.content:
+                        links.append(n.content)
+                    elif n.is_doc_file and n.file_name:
+                        files.append(n.file_name)
+                    elif n.is_video and n.file_name:
+                        files.append(f"🎬 {n.file_name}")
+
+                if text_notes:
+                    d["notes"] = " | ".join(text_notes)
+                if image_paths:
+                    d["image_paths"] = image_paths  # AIWorker 子线程会做 Vision 识别
+                if links:
+                    d["links"] = links
+                if files:
+                    d["files"] = files
+
+            enriched.append(d)
+        return enriched
+
+    def _on_progress(self, task_type: str, message: str) -> None:
+        if task_type == "daily_review":
+            self._content_browser.setMarkdown(f"⏳ {message}")
 
     def _on_review_ready(self, task_type: str, result: object) -> None:
         if task_type != "daily_review":

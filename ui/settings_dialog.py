@@ -183,6 +183,23 @@ class SettingsDialog(QDialog):
         self._model_combo.setFont(QFont("Microsoft YaHei", 10))
         ai_group_layout.addWidget(self._field_row("模型名称", self._model_combo))
 
+        # Token 用量限制
+        self._token_limit_slider, self._token_limit_label = self._make_slider(
+            0, 2000, 500, "K", scale=1, fmt="{:.0f}K"
+        )
+        # 0 值特殊显示为"不限"
+        def _update_token_label(v: int) -> None:
+            self._token_limit_label.setText("不限" if v == 0 else f"{v}K")
+        self._token_limit_slider.valueChanged.connect(_update_token_label)
+        ai_group_layout.addLayout(
+            self._slider_row("周Token上限", self._token_limit_slider, self._token_limit_label)
+        )
+
+        # Token 用量显示
+        self._token_usage_lbl = QLabel("本周用量：--")
+        self._token_usage_lbl.setStyleSheet("color: #A09DB8; font-size: 10px;")
+        ai_group_layout.addWidget(self._token_usage_lbl)
+
         content_layout.addWidget(self._ai_config_group)
 
         # 总开关联动
@@ -531,6 +548,30 @@ class SettingsDialog(QDialog):
         self._api_key_input.setText(self._settings.get("ai_api_key", ""))
         self._base_url_input.setText(self._settings.get("ai_base_url", "https://api.deepseek.com/v1"))
         self._model_combo.setCurrentText(self._settings.get("ai_model", "deepseek-v3.2"))
+
+        # Token 限额（存储为千位数，0=不限制）
+        token_limit_k = self._settings.get_int("weekly_token_limit", 0) // 1000
+        self._token_limit_slider.setValue(token_limit_k)
+        self._token_limit_label.setText(f"{token_limit_k}K" if token_limit_k > 0 else "不限")
+        # 加载本周用量
+        try:
+            from data.token_repository import TokenRepository
+            repo = TokenRepository()
+            used = repo.get_week_total()
+            limit = self._settings.get_int("weekly_token_limit", 0)
+            if limit > 0:
+                pct = min(100, used * 100 // limit)
+                color = "#52C41A" if pct < 80 else ("#FFB347" if pct < 100 else "#FF6B6B")
+                self._token_usage_lbl.setText(
+                    f"本周用量：{used:,} / {limit:,} tokens（{pct}%）"
+                )
+                self._token_usage_lbl.setStyleSheet(f"color: {color}; font-size: 10px;")
+            else:
+                self._token_usage_lbl.setText(f"本周用量：{used:,} tokens（无上限）")
+                self._token_usage_lbl.setStyleSheet("color: #A09DB8; font-size: 10px;")
+        except Exception:
+            pass
+
         self._enabled_check.setChecked(self._settings.get_bool("reminder_enabled", True))
         self._interval_slider.setValue(self._settings.get_int("reminder_interval_minutes", 45))
         self._dark_mode_check.setChecked(self._settings.get("theme", "light") == "dark")
@@ -672,11 +713,13 @@ class SettingsDialog(QDialog):
             QTimer.singleShot(100, do_extract)
 
     def _on_save(self) -> None:
+        token_limit_k = self._token_limit_slider.value()
         self._settings.set_many({
             "ai_enabled": "1" if self._ai_enabled_check.isChecked() else "0",
             "ai_api_key": self._api_key_input.text().strip(),
             "ai_base_url": self._base_url_input.text().strip(),
             "ai_model": self._model_combo.currentText().strip(),
+            "weekly_token_limit": str(token_limit_k * 1000),  # 存储实际 token 数
             "reminder_enabled": "1" if self._enabled_check.isChecked() else "0",
             "reminder_interval_minutes": str(self._interval_slider.value()),
             "theme": "dark" if self._dark_mode_check.isChecked() else "light",

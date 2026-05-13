@@ -22,14 +22,14 @@ from PyQt6.QtCore import (
     QObject, QPoint, QRect, QSize, QTimer, Qt, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QPainter, QLinearGradient, QBrush,
+    QColor, QPainter, QLinearGradient, QBrush,
 )
-from PyQt6.QtWidgets import QApplication, QWidget, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QApplication, QWidget
 
 logger = logging.getLogger(__name__)
 
 SNAP_THRESHOLD = 40      # 距屏幕边缘多少像素触发吸附
-MINI_H = 24              # 迷你条高度（极致紧凑）
+MINI_H = 10              # 迷你条高度（极致紧凑，无文字）
 MINI_W = 220             # 迷你条参考宽度（实际全宽由窗口决定）
 HOVER_EXPAND_DELAY = 80  # 悬浮 80ms 后展开
 AUTO_COLLAPSE_DELAY = 100   # 鼠标离开 100ms 后折叠
@@ -301,9 +301,9 @@ class EdgeSnapManager(QObject):
 
 class MiniBar(QWidget):
     """
-    吸附后显示的迷你信息条（固定宽 MINI_W，高 MINI_H）
+    吸附后显示的迷你信息条（高 MINI_H = 10px，纯色细条，不显示任何文字）
 
-    显示：🍅番茄倒计时 | ⏰提醒倒计时 | 时钟
+    鼠标悬浮时展开为完整窗口。
     """
 
     def __init__(self, parent=None):
@@ -311,120 +311,53 @@ class MiniBar(QWidget):
         self.setFixedHeight(MINI_H)
         self._is_dark = False
         self._reminder_ratio = 1.0
-        self._setup_ui()
-
-        self._clock_timer = QTimer(self)
-        self._clock_timer.setInterval(1000)
-        self._clock_timer.timeout.connect(self._update_clock)
-        self._clock_timer.start()
-        self._update_clock()
-
-        self._alert_timer = QTimer(self)
-        self._alert_timer.setSingleShot(True)
-        self._alert_timer.setInterval(3000)
-        self._alert_timer.timeout.connect(self._clear_alert)
-
-    def _setup_ui(self) -> None:
-        self.setObjectName("MiniBar")
-        row = QHBoxLayout(self)
-        row.setContentsMargins(6, 0, 6, 0)
-        row.setSpacing(4)
-        row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        # 🍅 番茄钟
-        self._pomodoro_lbl = QLabel("🍅")
-        self._pomodoro_lbl.setFont(QFont("Segoe UI Emoji", 8))
-        self._pomodoro_lbl.setFixedWidth(56)
-
-        # ⏰ 提醒倒计时
-        self._reminder_lbl = QLabel("⏰ --:--")
-        self._reminder_lbl.setFont(QFont("Microsoft YaHei", 8))
-        self._reminder_lbl.setFixedWidth(56)
-
-        # 提醒文案（弹出时短暂显示）
-        self._alert_lbl = QLabel()
-        self._alert_lbl.setFont(QFont("Microsoft YaHei", 8))
-        self._alert_lbl.setFixedWidth(0)   # 默认隐藏（宽度为0）
-
-        # 时钟
-        self._clock_lbl = QLabel()
-        self._clock_lbl.setFont(QFont("Microsoft YaHei", 9, QFont.Weight.Bold))
-        self._clock_lbl.setFixedWidth(40)
-        self._clock_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-
-        row.addWidget(self._pomodoro_lbl)
-        row.addWidget(self._reminder_lbl)
-        row.addStretch()
-        row.addWidget(self._alert_lbl)
-        row.addWidget(self._clock_lbl)
 
     # ------------------------------------------------------------------ #
     #  主题
     # ------------------------------------------------------------------ #
 
     def apply_theme(self, theme) -> None:
-        """随主题切换背景和文字色"""
+        """随主题切换背景色"""
         self._is_dark = theme.name == "dark"
-        # 更新时钟颜色
-        self._clock_lbl.setStyleSheet(
-            f"font-size: 9px; font-weight: bold; color: {theme.text_primary};"
-        )
-        # 更新提醒倒计时颜色
-        warn_color = theme.warning if self._reminder_ratio < 0.2 else theme.text_secondary
-        self._reminder_lbl.setStyleSheet(f"font-size: 8px; color: {warn_color};")
         self.update()  # 重绘背景
 
     # ------------------------------------------------------------------ #
-    #  数据更新
+    #  数据更新（保留接口兼容，但不再显示内容）
     # ------------------------------------------------------------------ #
 
     def update_pomodoro(self, text: str, color: str = "#FF6B6B") -> None:
-        self._pomodoro_lbl.setText(text)
-        self._pomodoro_lbl.setStyleSheet(f"color: {color}; font-size: 8px;")
+        pass  # 迷你条不显示文字
 
     def update_reminder(self, seconds_left: int, total: int) -> None:
-        m, s = divmod(seconds_left, 60)
         self._reminder_ratio = seconds_left / total if total > 0 else 1.0
-        self._reminder_lbl.setText(f"⏰ {m:02d}:{s:02d}")
-        warn = self._reminder_ratio < 0.2
-        self._reminder_lbl.setStyleSheet(
-            f"font-size: 8px; color: {'#FFB347' if warn else '#8885A8'};"
-        )
+        self.update()  # 可能改变颜色
 
     def show_alert(self, text: str) -> None:
-        """提醒触发时短暂显示文案"""
-        short = text[:16] + "…" if len(text) > 16 else text
-        self._alert_lbl.setText(f"🔔 {short}")
-        self._alert_lbl.setFixedWidth(110)
-        self._alert_lbl.setStyleSheet("font-size: 8px; color: #FF6B6B; font-weight: bold;")
-        self._alert_timer.start()
-
-    def _clear_alert(self) -> None:
-        self._alert_lbl.setText("")
-        self._alert_lbl.setFixedWidth(0)
-
-    def _update_clock(self) -> None:
-        from datetime import datetime
-        self._clock_lbl.setText(datetime.now().strftime("%H:%M"))
+        pass  # 提醒时直接展开，不在迷你条显示
 
     # ------------------------------------------------------------------ #
-    #  绘制背景
+    #  绘制背景（纯色细条 + 品牌色指示线）
     # ------------------------------------------------------------------ #
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        # 背景
         if self._is_dark:
-            # 深色：深紫渐变
-            grad = QLinearGradient(0, 0, self.width(), 0)
-            grad.setColorAt(0, QColor(30, 27, 50, 245))
-            grad.setColorAt(1, QColor(40, 35, 65, 245))
+            bg = QColor(30, 27, 50, 220)
         else:
-            # 浅色：奶油渐变
-            grad = QLinearGradient(0, 0, self.width(), 0)
-            grad.setColorAt(0, QColor(254, 252, 247, 240))
-            grad.setColorAt(1, QColor(240, 238, 248, 240))
+            bg = QColor(240, 238, 248, 220)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(grad))
-        p.drawRoundedRect(self.rect(), 6, 6)
+        p.setBrush(QBrush(bg))
+        p.drawRoundedRect(0, 0, w, h, h // 2, h // 2)
+
+        # 底部品牌色指示线（2px）
+        accent = QLinearGradient(0, 0, w, 0)
+        accent.setColorAt(0, QColor("#8B85FF"))
+        accent.setColorAt(1, QColor("#6C63FF"))
+        p.setBrush(QBrush(accent))
+        p.drawRoundedRect(0, h - 2, w, 2, 1, 1)
+
         p.end()

@@ -102,6 +102,16 @@ class Database:
             );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_type_date
                 ON reports(report_type, report_date);
+
+            -- Token 用量统计表
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_type         TEXT    NOT NULL,  -- 'parse'|'reminder'|'daily'|'weekly'|'vision'
+                prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+                completion_tokens INTEGER NOT NULL DEFAULT 0,
+                total_tokens      INTEGER NOT NULL DEFAULT 0,
+                called_at         TEXT    NOT NULL   -- ISO8601
+            );
             """
         )
         conn.commit()

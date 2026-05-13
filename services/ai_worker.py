@@ -3,11 +3,12 @@ ai_worker.py - AI 异步工作线程
 
 将 AIService 的同步阻塞调用包装进 QThread，避免 AI 网络请求卡住 Qt UI 主线程。
 
-支持四种任务类型（task_type）：
-  - "parse_task"       : 自然语言 → 结构化任务
-  - "reminder_texts"   : 批量生成提醒文案
-  - "daily_review"     : 今日复盘报告
-  - "weekly_report"    : 周报整理
+支持任务类型（task_type）：
+  - "parse_task"          : 自然语言 → 结构化任务
+  - "reminder_texts"      : 批量生成提醒文案
+  - "daily_review"        : 今日复盘报告（v2：含笔记+图片描述）
+  - "weekly_report"       : 周报整理（v2）
+  - "describe_images"     : 批量图片识别
 
 使用方式（主线程中）：
     worker = AIWorker(ai_service)
@@ -35,16 +36,8 @@ class AIWorker(QThread):
 
     Signals:
         result_ready(task_type: str, result: object)
-            - task_type == "parse_task"     → result: dict
-            - task_type == "reminder_texts" → result: list[str]
-            - task_type == "daily_review"   → result: str
-            - task_type == "weekly_report"  → result: str
-
         error_occurred(task_type: str, error_message: str)
-            AI 调用失败时发射，携带任务类型和错误信息
-        
         progress_updated(task_type: str, message: str)
-            可选进度提示，用于 UI 展示"正在思考中..."
     """
 
     result_ready = pyqtSignal(str, object)
@@ -76,7 +69,7 @@ class AIWorker(QThread):
     def generate_daily_review(
         self, done_tasks: list[dict], undone_tasks: list[dict]
     ) -> "AIWorker":
-        """配置为"今日复盘"模式"""
+        """配置为"今日复盘"模式（v2：任务可带笔记和图片路径，子线程自动识别）"""
         self._task_type = "daily_review"
         self._kwargs = {"done_tasks": done_tasks, "undone_tasks": undone_tasks}
         return self
@@ -109,7 +102,14 @@ class AIWorker(QThread):
                 result = self._service.generate_reminder_texts(**self._kwargs)
 
             elif task_type == "daily_review":
-                result = self._service.generate_daily_review(**self._kwargs)
+                # v2：先在子线程批量识别图片，再生成日报
+                done_tasks = self._kwargs.get("done_tasks", [])
+                undone_tasks = self._kwargs.get("undone_tasks", [])
+                self.progress_updated.emit(task_type, "正在识别图片...")
+                self._enrich_tasks_with_vision(done_tasks)
+                self._enrich_tasks_with_vision(undone_tasks)
+                self.progress_updated.emit(task_type, "正在生成日报...")
+                result = self._service.generate_daily_review(done_tasks, undone_tasks)
 
             elif task_type == "weekly_report":
                 result = self._service.generate_weekly_report(**self._kwargs)
@@ -124,6 +124,21 @@ class AIWorker(QThread):
             error_msg = str(e)
             logger.error("AIWorker 失败: task_type=%s, error=%s", task_type, error_msg)
             self.error_occurred.emit(task_type, error_msg)
+
+    # ------------------------------------------------------------------ #
+    #  内部：图片识别（在子线程运行）
+    # ------------------------------------------------------------------ #
+
+    def _enrich_tasks_with_vision(self, tasks: list[dict]) -> None:
+        """
+        遍历任务列表，对含 image_paths 的任务调用 Vision 识别，
+        将描述填入 image_descriptions 字段。
+        """
+        for t in tasks:
+            image_paths = t.get("image_paths", [])
+            if image_paths:
+                descriptions = self._service.describe_images_batch(image_paths)
+                t["image_descriptions"] = descriptions
 
 
 # --------------------------------------------------------------------------- #
@@ -140,17 +155,6 @@ def run_ai_task(
 ) -> AIWorker:
     """
     工厂函数：创建 AIWorker、连接信号、启动线程。
-
-    Args:
-        service:   AIService 实例
-        task_type: "parse_task" | "reminder_texts" | "daily_review" | "weekly_report"
-        on_result: result_ready 的槽函数 (task_type: str, result: object) -> None
-        on_error:  error_occurred 的槽函数（可选）
-        parent:    Qt 父对象
-        **kwargs:  传递给对应任务方法的参数
-
-    Returns:
-        已启动的 AIWorker 实例（调用方负责保持引用，避免被 GC 回收）
     """
     worker = AIWorker(service, parent=parent)
 
