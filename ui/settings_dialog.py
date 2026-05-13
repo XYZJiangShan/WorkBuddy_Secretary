@@ -1,11 +1,13 @@
 """
-settings_dialog.py - 设置弹窗（v2）
+settings_dialog.py - 设置弹窗（v3）
 
-四组配置：
+配置分组：
   1. AI 接口：API Key / Base URL / 模型名
   2. 提醒配置：间隔分钟数滑块 / 开关
   3. 外观：深色模式开关 / 透明度滑块
-  4. 番茄钟：专注时长 / 短休息 / 长休息 / 热键开关
+  4. 热键：全局热键开关
+  5. 企业微信文档：Cookie 配置
+  6. GitHub 数据同步
 """
 
 from __future__ import annotations
@@ -234,28 +236,14 @@ class SettingsDialog(QDialog):
 
         self._add_divider(content_layout)
 
-        # ---- 4. 番茄钟配置 ----
-        content_layout.addWidget(self._section_label("🍅 番茄钟配置"))
-
-        self._focus_slider, self._focus_value_label = self._make_slider(5, 60, 25, "分钟")
-        content_layout.addLayout(self._slider_row("专注时长", self._focus_slider, self._focus_value_label))
-
-        self._short_break_slider, self._short_break_value_label = self._make_slider(1, 15, 5, "分钟")
-        content_layout.addLayout(self._slider_row("短休息", self._short_break_slider, self._short_break_value_label))
-
-        self._long_break_slider, self._long_break_value_label = self._make_slider(5, 30, 15, "分钟")
-        content_layout.addLayout(self._slider_row("长休息", self._long_break_slider, self._long_break_value_label))
-
-        self._add_divider(content_layout)
-
-        # ---- 5. 热键配置 ----
+        # ---- 4. 热键配置 ----
         content_layout.addWidget(self._section_label("⌨️ 全局热键"))
         self._hotkey_enabled_check = QCheckBox("启用全局热键（Alt+空格 唤出窗口）")
         self._hotkey_enabled_check.setStyleSheet("color: #E8E5FF; font-size: 11px;")
         self._hotkey_enabled_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._hotkey_enabled_check)
 
-        # ---- 6. 企业微信文档 Cookie ----
+        # ---- 5. 企业微信文档 Cookie ----
         content_layout.addWidget(self._section_label("🔗 企业微信文档访问"))
 
         cookie_hint = QLabel(
@@ -354,7 +342,7 @@ class SettingsDialog(QDialog):
 
         content_layout.addStretch()
 
-        # ---- 7. GitHub 数据同步 ----
+        # ---- 6. GitHub 数据同步 ----
         self._add_divider(content_layout)
         content_layout.addWidget(self._section_label("☁️ GitHub 数据同步"))
 
@@ -578,9 +566,6 @@ class SettingsDialog(QDialog):
         opacity_pct = int(self._settings.get_float("window_opacity", 0.92) * 100)
         self._opacity_slider.setValue(opacity_pct)
         self._opacity_value_label.setText(f"{opacity_pct}%")
-        self._focus_slider.setValue(self._settings.get_int("pomodoro_focus_minutes", 25))
-        self._short_break_slider.setValue(self._settings.get_int("pomodoro_short_break_minutes", 5))
-        self._long_break_slider.setValue(self._settings.get_int("pomodoro_long_break_minutes", 15))
         self._hotkey_enabled_check.setChecked(self._settings.get_bool("hotkey_enabled", True))
         # 企微 Cookie
         cookie = self._settings.get("wxwork_cookie", "")
@@ -724,9 +709,6 @@ class SettingsDialog(QDialog):
             "reminder_interval_minutes": str(self._interval_slider.value()),
             "theme": "dark" if self._dark_mode_check.isChecked() else "light",
             "window_opacity": f"{self._opacity_slider.value() / 100:.2f}",
-            "pomodoro_focus_minutes": str(self._focus_slider.value()),
-            "pomodoro_short_break_minutes": str(self._short_break_slider.value()),
-            "pomodoro_long_break_minutes": str(self._long_break_slider.value()),
             "hotkey_enabled": "1" if self._hotkey_enabled_check.isChecked() else "0",
             "wxwork_cookie": self._wxwork_cookie_edit.text().strip(),
             # GitHub 同步

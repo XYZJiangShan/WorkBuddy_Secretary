@@ -5,7 +5,6 @@ stats_widget.py - 数据统计面板组件
   - 今日待办完成率（进度环 + 数字）
   - 本周每日完成数迷你柱状图（纯字符）
   - 今日休息提醒次数
-  - 累计专注番茄数
 """
 
 from __future__ import annotations
@@ -195,7 +194,6 @@ class StatsWidget(QWidget):
     def __init__(self, task_repo: TaskRepository, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._task_repo = task_repo
-        self._tomato_count = 0
         self._setup_ui()
 
         # 定时刷新（每分钟）
@@ -238,10 +236,8 @@ class StatsWidget(QWidget):
         cards_col.setSpacing(6)
 
         self._remind_card = _StatCard("🔔", "0", "今日提醒次数", "#FFB347")
-        self._tomato_card = _StatCard("🍅", "0", "累计番茄数", "#FF6B6B")
 
         cards_col.addWidget(self._remind_card)
-        cards_col.addWidget(self._tomato_card)
         top_row.addLayout(cards_col, 1)
         root.addLayout(top_row)
 
@@ -262,11 +258,6 @@ class StatsWidget(QWidget):
         self._refresh_today()
         self._refresh_week()
         self._refresh_reminders()
-
-    def set_tomato_count(self, count: int) -> None:
-        """由外部（PomodoroService）更新番茄数"""
-        self._tomato_count = count
-        self._tomato_card.set_value(str(count))
 
     # ------------------------------------------------------------------ #
     #  内部刷新逻辑

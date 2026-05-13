@@ -1,9 +1,10 @@
 """
-floating_window.py - 主悬浮窗口（v2，含番茄钟/统计/深色模式/透明度）
+floating_window.py - 主悬浮窗口（v3，统计/深色模式/透明度/休息弹窗）
 
-新增：
-  - 标题栏：番茄钟按钮 🍅、统计按钮 📊、主题切换 🌙
-  - 内容区：番茄钟面板（可展开/收起）、统计面板（可展开/收起）
+功能：
+  - 标题栏：统计按钮 📊、主题切换 🌙
+  - 内容区：统计面板（可展开/收起）
+  - 底部窄倒计时进度条（可点击展开休息提醒弹窗）
   - 主题：响应 ThemeManager.theme_changed 信号，动态重绘
   - 透明度：启动时从 settings 读取并应用
 """
@@ -18,7 +19,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QColor, QFont, QLinearGradient,
-    QPainter, QPaintEvent, QPen, QBrush,
+    QPainter, QPaintEvent, QPen, QBrush, QCursor,
 )
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QPushButton,
@@ -31,11 +32,8 @@ from data.task_note_repository import TaskNoteRepository
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
 from services.reminder_service import ReminderService
-from services.pomodoro_service import PomodoroService, PomodoroState
-from ui.reminder_banner import ReminderBanner
 from ui.task_list_widget import TaskListWidget
 from ui.stats_widget import StatsWidget
-from ui.pomodoro_widget import PomodoroWidget
 from ui.theme import theme_manager, Theme
 from ui.edge_snap import EdgeSnapManager, MiniBar
 
@@ -64,7 +62,6 @@ class FloatingWindow(QWidget):
         task_repo: TaskRepository,
         ai_service: AIService,
         reminder_service: ReminderService,
-        pomodoro_service: Optional[PomodoroService] = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -73,10 +70,8 @@ class FloatingWindow(QWidget):
         self._note_repo = TaskNoteRepository()
         self._ai = ai_service
         self._reminder = reminder_service
-        self._pomodoro = pomodoro_service or PomodoroService(self)
         self._drag_pos: Optional[QPoint] = None
         self._ai_worker: Optional[AIWorker] = None
-        self._show_pomodoro: bool = False
         self._show_stats: bool = False
         self._detail_panels: list = []  # 追踪所有打开的任务详情面板
 
@@ -154,10 +149,6 @@ class FloatingWindow(QWidget):
         card_layout.setContentsMargins(0, 0, 0, 0)
         card_layout.setSpacing(0)
 
-        # ---- 提醒横幅 ----
-        self._banner = ReminderBanner(self._card)
-        card_layout.addWidget(self._banner)
-
         # ---- 标题栏 ----
         self._title_bar = self._build_title_bar()
         card_layout.addWidget(self._title_bar)
@@ -168,12 +159,6 @@ class FloatingWindow(QWidget):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
 
-        # 番茄钟面板（默认隐藏）
-        self._pomodoro_widget = PomodoroWidget(self._pomodoro, self._content)
-        self._pomodoro_widget.hide()
-        self._pomodoro_widget.closed.connect(self._hide_pomodoro)
-        content_layout.addWidget(self._pomodoro_widget)
-
         # 任务列表
         self._task_list = TaskListWidget(self._content)
         content_layout.addWidget(self._task_list, 1)
@@ -183,8 +168,9 @@ class FloatingWindow(QWidget):
         self._stats_widget.hide()
         content_layout.addWidget(self._stats_widget)
 
-        # 倒计时进度条
+        # 底部窄倒计时进度条（可点击展开提醒弹窗）
         self._progress_bar = CountdownProgressBar(self._content)
+        self._progress_bar.clicked.connect(self._show_reminder_popup)
         content_layout.addWidget(self._progress_bar)
 
         card_layout.addWidget(self._content, 1)
@@ -215,7 +201,6 @@ class FloatingWindow(QWidget):
         row.addStretch()
 
         # 功能按钮组
-        self._pomodoro_btn = self._make_icon_btn("🍅", "番茄钟专注模式")
         self._stats_btn = self._make_icon_btn("📊", "今日统计")
         self._history_btn = self._make_icon_btn("📋", "历史任务记录")
         self._weekly_btn = self._make_icon_btn("📝", "周报")
@@ -230,7 +215,7 @@ class FloatingWindow(QWidget):
             QPushButton:hover { background: rgba(255,107,107,0.15); color: #FF6B6B; }
         """)
 
-        for btn in [self._pomodoro_btn, self._stats_btn, self._history_btn,
+        for btn in [self._stats_btn, self._history_btn,
                     self._weekly_btn, self._settings_btn]:
             row.addWidget(btn)
         row.addWidget(self._close_btn)
@@ -259,14 +244,9 @@ class FloatingWindow(QWidget):
         # 标题栏按钮
         self._settings_btn.clicked.connect(self.open_settings)
         self._close_btn.clicked.connect(self.hide)
-        self._pomodoro_btn.clicked.connect(self._toggle_pomodoro)
         self._stats_btn.clicked.connect(self._toggle_stats)
         self._history_btn.clicked.connect(self._open_history)
         self._weekly_btn.clicked.connect(self.open_weekly_report)
-
-        # 横幅
-        self._banner.closed.connect(self._on_banner_closed)
-        self._banner.snoozed.connect(self._reminder.snooze)
 
         # 任务列表
         self._task_list.task_add_requested.connect(self._on_task_add_requested)
@@ -280,13 +260,6 @@ class FloatingWindow(QWidget):
         # 提醒服务
         self._reminder.reminder_triggered.connect(self._on_reminder_triggered)
         self._reminder.countdown_tick.connect(self._on_countdown_tick)
-
-        # 番茄钟连接休息提醒
-        self._pomodoro.reminder_pause_requested.connect(self._reminder.pause)
-        self._pomodoro.reminder_resume_requested.connect(self._reminder.resume)
-        self._pomodoro.phase_completed.connect(self._on_pomodoro_phase_completed)
-        self._pomodoro.state_changed.connect(self._on_pomodoro_state_changed)
-        self._pomodoro.tick.connect(self._on_pomodoro_tick)
 
         # 主题
         theme_manager.theme_changed.connect(self._apply_theme)
@@ -311,18 +284,8 @@ class FloatingWindow(QWidget):
         self._task_list.set_ai_mode(ai_enabled)
 
     # ------------------------------------------------------------------ #
-    #  番茄钟 / 统计面板切换
+    #  统计面板切换
     # ------------------------------------------------------------------ #
-
-    def _toggle_pomodoro(self) -> None:
-        self._show_pomodoro = not self._show_pomodoro
-        self._pomodoro_widget.setVisible(self._show_pomodoro)
-        self._adjust_height()
-
-    def _hide_pomodoro(self) -> None:
-        self._show_pomodoro = False
-        self._pomodoro_widget.hide()
-        self._adjust_height()
 
     def _toggle_stats(self) -> None:
         self._show_stats = not self._show_stats
@@ -331,11 +294,8 @@ class FloatingWindow(QWidget):
             self._stats_widget.refresh()
         self._adjust_height()
 
-
     def _adjust_height(self) -> None:
         extra = 0
-        if self._show_pomodoro:
-            extra += 200
         if self._show_stats:
             extra += 180
         self.resize(WINDOW_W, WINDOW_H_FULL + extra)
@@ -350,8 +310,8 @@ class FloatingWindow(QWidget):
         self._card.setStyleSheet(f"""
             #Card {{
                 background: {theme.bg_card};
-                border-radius: 16px;
-                border: 1px solid {theme.border};
+                border-radius: 10px;
+                border: 0.5px solid {theme.border};
             }}
         """)
 
@@ -366,7 +326,7 @@ class FloatingWindow(QWidget):
             }}
             QPushButton:hover {{ background: rgba(108,99,255,0.15); color: {theme.accent}; }}
         """
-        for btn in [self._pomodoro_btn, self._stats_btn, self._history_btn,
+        for btn in [self._stats_btn, self._history_btn,
                     self._weekly_btn, self._settings_btn]:
             btn.setStyleSheet(btn_style)
         self._close_btn.setStyleSheet(f"""
@@ -383,9 +343,6 @@ class FloatingWindow(QWidget):
 
         # ---- 任务列表 ----
         self._task_list.apply_theme(theme)
-
-        # ---- 番茄钟面板 ----
-        self._pomodoro_widget.apply_theme(theme)
 
         # ---- 迷你条 ----
         if hasattr(self, "_mini_bar"):
@@ -454,26 +411,72 @@ class FloatingWindow(QWidget):
     # ------------------------------------------------------------------ #
 
     def _on_reminder_triggered(self, text: str) -> None:
-        # 迷你模式下展开
+        """提醒触发：保存文案，自动弹出提醒弹窗"""
+        self._last_reminder_text = text
+        # 迷你模式下先展开
         if hasattr(self, "_snap") and self._snap.is_mini:
             self._mini_bar.show_alert(text)
             self._snap.force_expand()
         self.show()
         self.raise_()
-        self._banner.show_text(text)
+        # 进度条闪烁提示
+        self._progress_bar.flash_alert()
+        # 自动弹出提醒弹窗
+        self._show_reminder_popup()
 
-    def _on_banner_closed(self) -> None:
+    def _show_reminder_popup(self) -> None:
+        """展开休息提醒弹窗（从进度条正上方弹出）"""
+        from ui.reminder_popup import ReminderPopup
+        text = getattr(self, "_last_reminder_text", "该休息了，站起来活动一下吧 👀")
+
+        # 如果弹窗已存在，先关掉
+        if hasattr(self, "_reminder_popup") and self._reminder_popup is not None:
+            try:
+                self._reminder_popup.close()
+            except RuntimeError:
+                pass
+
+        popup = ReminderPopup(text, parent=None)
+        popup.dismissed.connect(self._on_popup_dismissed)
+        popup.snoozed.connect(self._on_popup_snoozed)
+
+        # 定位到进度条正上方
+        bar_global = self._progress_bar.mapToGlobal(
+            self._progress_bar.rect().topLeft()
+        )
+        popup_w = self.width() - 16  # 略窄于主窗口
+        popup.setFixedWidth(popup_w)
+        popup.adjustSize()
+        popup_h = popup.sizeHint().height()
+
+        x = bar_global.x() + (self._progress_bar.width() - popup_w) // 2
+        y = bar_global.y() - popup_h - 6
+
+        # 防止超出屏幕上方
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geo = screen.availableGeometry()
+            if y < screen_geo.top():
+                y = bar_global.y() + self._progress_bar.height() + 6
+
+        popup.move(x, y)
+        popup.show()
+        popup.raise_()
+        self._reminder_popup = popup
+
+    def _on_popup_dismissed(self) -> None:
+        """弹窗关闭"""
         pass
+
+    def _on_popup_snoozed(self, seconds: int) -> None:
+        """弹窗延迟"""
+        self._reminder.snooze(seconds)
 
     def _on_countdown_tick(self, seconds_left: int) -> None:
         total = self._reminder.total_seconds
         self._progress_bar.update_progress(seconds_left, total)
         if hasattr(self, "_mini_bar"):
             self._mini_bar.update_reminder(seconds_left, total)
-
-    def _on_pomodoro_phase_completed(self, state_value: str, count: int) -> None:
-        if self._show_stats:
-            self._stats_widget.set_tomato_count(count)
 
     # ------------------------------------------------------------------ #
     #  折叠 / 展开
@@ -577,26 +580,6 @@ class FloatingWindow(QWidget):
             except Exception:
                 pass
         self._detail_panels.clear()
-
-    # ------------------------------------------------------------------ #
-    #  番茄钟迷你条同步
-    # ------------------------------------------------------------------ #
-
-    def _on_pomodoro_state_changed(self, state_value: str, label: str) -> None:
-        colors = {
-            "focus": "#FF6B6B",
-            "short_break": "#52C41A",
-            "long_break": "#36CFC9",
-            "idle": "#A09DB8",
-        }
-        color = colors.get(state_value, "#A09DB8")
-        self._mini_bar.update_pomodoro(label, color)
-
-    def _on_pomodoro_tick(self, seconds_left: int, total: int) -> None:
-        # 迷你条只显示专注阶段倒计时
-        if self._pomodoro.state.value == "focus":
-            m, s = divmod(seconds_left, 60)
-            self._mini_bar.update_pomodoro(f"🍅 {m:02d}:{s:02d}", "#FF6B6B")
 
     # ------------------------------------------------------------------ #
     #  边缘吸附 / 迷你模式
@@ -752,41 +735,69 @@ class FloatingWindow(QWidget):
 
 
 # --------------------------------------------------------------------------- #
-#  倒计时进度条
+#  倒计时进度条（窄条，可点击展开提醒弹窗）
 # --------------------------------------------------------------------------- #
 
 class CountdownProgressBar(QWidget):
+    """底部窄倒计时进度条，点击可展开提醒弹窗"""
+
+    clicked = pyqtSignal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._seconds_left = 0
         self._total_seconds = 1
+        self._flash_on = False
+        self._flash_timer: Optional[QTimer] = None
+        self._flash_count = 0
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setFixedHeight(28)
+        self.setFixedHeight(14)
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 12, 4)
-        layout.setSpacing(8)
-
-        self._time_label = QLabel("休息提醒：45:00")
-        self._time_label.setStyleSheet("color: #A09DB8; font-size: 9px;")
+        layout.setContentsMargins(8, 2, 8, 4)
+        layout.setSpacing(0)
 
         self._bar = _ProgressBarInner()
         self._bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._bar.setFixedHeight(4)
 
-        layout.addWidget(self._time_label)
         layout.addWidget(self._bar, 1)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
     def update_progress(self, seconds_left: int, total_seconds: int) -> None:
         self._seconds_left = seconds_left
         self._total_seconds = max(total_seconds, 1)
-        m, s = divmod(seconds_left, 60)
-        self._time_label.setText(f"下次提醒：{m:02d}:{s:02d}")
         self._bar.set_ratio(seconds_left / self._total_seconds)
+        # 提醒文字 tooltip
+        m, s = divmod(seconds_left, 60)
+        self.setToolTip(f"下次提醒：{m:02d}:{s:02d}（点击查看）")
+
+    def flash_alert(self) -> None:
+        """提醒触发时闪烁 3 次"""
+        self._flash_count = 0
+        if self._flash_timer is None:
+            self._flash_timer = QTimer(self)
+            self._flash_timer.setInterval(300)
+            self._flash_timer.timeout.connect(self._do_flash)
+        self._flash_timer.start()
+
+    def _do_flash(self) -> None:
+        self._flash_count += 1
+        self._flash_on = not self._flash_on
+        self._bar.set_flash(self._flash_on)
+        if self._flash_count >= 6:
+            if self._flash_timer:
+                self._flash_timer.stop()
+            self._flash_on = False
+            self._bar.set_flash(False)
 
     def apply_theme(self, theme: Theme) -> None:
-        self._time_label.setStyleSheet(f"color: {theme.text_placeholder}; font-size: 9px;")
         self._bar.set_track_color(theme.progress_track)
 
 
@@ -795,6 +806,7 @@ class _ProgressBarInner(QWidget):
         super().__init__(parent)
         self._ratio = 1.0
         self._track_color = QColor("#DCD8F0")
+        self._flash = False
 
     def set_ratio(self, ratio: float) -> None:
         self._ratio = max(0.0, min(1.0, ratio))
@@ -802,6 +814,10 @@ class _ProgressBarInner(QWidget):
 
     def set_track_color(self, color: str) -> None:
         self._track_color = QColor(color)
+        self.update()
+
+    def set_flash(self, on: bool) -> None:
+        self._flash = on
         self.update()
 
     def paintEvent(self, event) -> None:
@@ -813,9 +829,14 @@ class _ProgressBarInner(QWidget):
         p.drawRoundedRect(0, 0, w, h, h // 2, h // 2)
         filled_w = int(w * self._ratio)
         if filled_w > 0:
-            grad = QLinearGradient(0, 0, filled_w, 0)
-            grad.setColorAt(0, QColor("#8B85FF"))
-            grad.setColorAt(1, QColor("#6C63FF"))
+            if self._flash:
+                grad = QLinearGradient(0, 0, filled_w, 0)
+                grad.setColorAt(0, QColor("#FF6B6B"))
+                grad.setColorAt(1, QColor("#FF8E53"))
+            else:
+                grad = QLinearGradient(0, 0, filled_w, 0)
+                grad.setColorAt(0, QColor("#8B85FF"))
+                grad.setColorAt(1, QColor("#6C63FF"))
             p.setBrush(QBrush(grad))
             p.drawRoundedRect(0, 0, filled_w, h, h // 2, h // 2)
         p.end()

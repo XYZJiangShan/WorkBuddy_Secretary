@@ -23,7 +23,6 @@ from data.settings_repository import SettingsRepository
 # ---- 服务层（无 Qt 依赖）----
 from services.ai_service import AIService
 from services.reminder_service import ReminderService
-from services.pomodoro_service import PomodoroService
 from services.hotkey_service import HotkeyService
 from services.sync_service import SyncService
 from services.auto_report_service import AutoReportService
@@ -117,7 +116,6 @@ def main() -> int:
         except Exception as e:
             logger.warning("AI 客户端预热失败（不影响运行）: %s", e)
     reminder_service = ReminderService(ai_service, settings)
-    pomodoro_service = PomodoroService()
     hotkey_service = HotkeyService(
         hotkey=settings.get("hotkey_toggle_window", "alt+space")
     )
@@ -135,15 +133,9 @@ def main() -> int:
                 logger.warning("启动同步失败: %s", result.message)
     QTimer.singleShot(2000, _startup_pull)  # 延迟 2 秒，等 Qt 事件循环稳定
 
-    pomodoro_service.update_durations(
-        focus_min=settings.get_int("pomodoro_focus_minutes", 25),
-        short_min=settings.get_int("pomodoro_short_break_minutes", 5),
-        long_min=settings.get_int("pomodoro_long_break_minutes", 15),
-    )
-
     # ---- UI 层 ----
     main_window = FloatingWindow(
-        settings, task_repo, ai_service, reminder_service, pomodoro_service
+        settings, task_repo, ai_service, reminder_service
     )
     tray = TrayIcon()
 
@@ -192,7 +184,7 @@ def main() -> int:
 
     main_window.open_settings.connect(
         lambda: _open_settings(settings, ai_service, reminder_service,
-                               pomodoro_service, hotkey_service, sync_service, main_window)
+                               hotkey_service, sync_service, main_window)
     )
     main_window.open_review.connect(
         lambda: _open_review(ai_service, task_repo, settings, reminder_service, main_window)
@@ -202,7 +194,7 @@ def main() -> int:
     )
     tray.open_settings.connect(
         lambda: _open_settings(settings, ai_service, reminder_service,
-                               pomodoro_service, hotkey_service, sync_service, main_window)
+                               hotkey_service, sync_service, main_window)
     )
     tray.open_weekly_report.connect(
         lambda: _open_weekly_report(ai_service, task_repo, settings, reminder_service)
@@ -230,7 +222,7 @@ def main() -> int:
     if not ai_service.is_configured():
         QTimer.singleShot(500, lambda: _open_settings(
             settings, ai_service, reminder_service,
-            pomodoro_service, hotkey_service, sync_service, main_window,
+            hotkey_service, sync_service, main_window,
             first_run=True
         ))
 
@@ -239,7 +231,7 @@ def main() -> int:
 
 
 def _open_settings(settings, ai_service, reminder_service,
-                   pomodoro_service, hotkey_service, sync_service, parent,
+                   hotkey_service, sync_service, parent,
                    first_run: bool = False):
     # ⚠️ 必须在 QDialog.exec() 之前等待 AI 子线程完成！
     # 子线程 openai/httpx 的 SSL read() 与 Qt 模态对话框 COM 初始化冲突
@@ -262,11 +254,6 @@ def _open_settings(settings, ai_service, reminder_service,
                 pass
         reminder_service.reload_settings()
         parent.apply_settings()
-        pomodoro_service.update_durations(
-            focus_min=settings.get_int("pomodoro_focus_minutes", 25),
-            short_min=settings.get_int("pomodoro_short_break_minutes", 5),
-            long_min=settings.get_int("pomodoro_long_break_minutes", 15),
-        )
         if settings.get_bool("hotkey_enabled", True):
             hotkey_service.update_hotkey(
                 settings.get("hotkey_toggle_window", "alt+space")
