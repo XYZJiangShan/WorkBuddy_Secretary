@@ -1,12 +1,15 @@
 """
-weekly_report_dialog.py - 周报弹窗
+weekly_report_dialog.py - 周报弹窗（v2，深色风格）
 
 展示 AI 生成的 Markdown 周报，支持选择周区间和一键复制。
-风格：奶油白磨砂卡片，独立模态弹窗。
+风格：深色卡片，与工具整体设计统一。
+
+安全关闭：弹窗关闭时等待 AIWorker 子线程结束，防止 QThread 运行中析构崩溃。
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from PyQt6.QtCore import Qt, QTimer
@@ -23,10 +26,12 @@ from data.report_repository import ReportRepository, Report
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
 
+logger = logging.getLogger(__name__)
+
 
 class WeeklyReportDialog(QDialog):
     """
-    周报弹窗
+    周报弹窗（深色风格）
 
     弹出时先展示加载占位，然后触发 AI 生成周报，
     结果回来后刷新内容区域。支持前后翻周。
@@ -74,14 +79,14 @@ class WeeklyReportDialog(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
 
-        # ---- 卡片容器（不再依赖 WA_TranslucentBackground，直接做圆角卡片）----
+        # ---- 卡片容器（深色风格）----
         card = QWidget()
         card.setObjectName("WeeklyCard")
         card.setStyleSheet("""
             #WeeklyCard {
-                background: #FEFCF7;
-                border-radius: 16px;
-                border: 1px solid rgba(108, 99, 255, 0.18);
+                background: rgba(30, 27, 48, 0.98);
+                border-radius: 12px;
+                border: 1px solid rgba(139, 133, 255, 0.25);
             }
         """)
 
@@ -94,10 +99,11 @@ class WeeklyReportDialog(QDialog):
         emoji_label = QLabel("📋")
         emoji_label.setFont(QFont("Segoe UI Emoji", 18))
         emoji_label.setFixedWidth(32)
+        emoji_label.setStyleSheet("background: transparent; border: none;")
 
         title_label = QLabel("周报")
         title_label.setFont(QFont("Microsoft YaHei", 13, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #2D2B3D;")
+        title_label.setStyleSheet("color: #8B85FF; background: transparent; border: none;")
 
         header_row.addWidget(emoji_label)
         header_row.addWidget(title_label)
@@ -116,7 +122,7 @@ class WeeklyReportDialog(QDialog):
 
         self._week_label = QLabel()
         self._week_label.setFont(QFont("Microsoft YaHei", 10))
-        self._week_label.setStyleSheet("color: #6B6880;")
+        self._week_label.setStyleSheet("color: #9994C0; background: transparent; border: none;")
         self._week_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._next_btn = QPushButton("▶")
@@ -135,7 +141,8 @@ class WeeklyReportDialog(QDialog):
         # 分割线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: rgba(108,99,255,0.15);")
+        line.setStyleSheet("color: rgba(139, 133, 255, 0.2); background: transparent; border: none; border-top: 1px solid rgba(139, 133, 255, 0.2);")
+        line.setFixedHeight(1)
         card_layout.addWidget(line)
 
         # ---- 内容滚动区 ----
@@ -146,7 +153,7 @@ class WeeklyReportDialog(QDialog):
             QScrollArea { border: none; background: transparent; }
             QScrollBar:vertical { width: 4px; background: transparent; }
             QScrollBar::handle:vertical {
-                background: rgba(108,99,255,0.3); border-radius: 2px;
+                background: rgba(139, 133, 255, 0.35); border-radius: 2px;
             }
         """)
 
@@ -157,7 +164,7 @@ class WeeklyReportDialog(QDialog):
             QTextBrowser {
                 background: transparent;
                 border: none;
-                color: #2D2B3D;
+                color: #E8E5FF;
             }
         """)
         self._content_browser.setMarkdown("⏳ AI 正在生成周报，请稍候…")
@@ -173,13 +180,20 @@ class WeeklyReportDialog(QDialog):
         self._copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._copy_btn.setStyleSheet("""
             QPushButton {
-                background: #6C63FF; color: white;
-                border: none; border-radius: 8px;
+                background: rgba(139, 133, 255, 0.25);
+                color: #8B85FF;
+                border: 1px solid rgba(139, 133, 255, 0.4);
+                border-radius: 8px;
                 padding: 6px 18px; font-size: 11px;
             }
-            QPushButton:hover { background: #8B85FF; }
+            QPushButton:hover {
+                background: rgba(139, 133, 255, 0.4);
+                color: #E8E5FF;
+            }
             QPushButton:disabled {
-                background: #D4D1F0; color: #A09DB8;
+                background: rgba(60, 55, 85, 0.5);
+                color: #5C5880;
+                border: 1px solid rgba(92, 88, 128, 0.3);
             }
         """)
         self._copy_btn.clicked.connect(self._on_copy)
@@ -188,11 +202,15 @@ class WeeklyReportDialog(QDialog):
         self._refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._refresh_btn.setStyleSheet("""
             QPushButton {
-                background: transparent; color: #6C63FF;
-                border: 1px solid #6C63FF; border-radius: 8px;
+                background: transparent; color: #9994C0;
+                border: 1px solid rgba(139, 133, 255, 0.25);
+                border-radius: 8px;
                 padding: 6px 18px; font-size: 11px;
             }
-            QPushButton:hover { background: rgba(108,99,255,0.08); }
+            QPushButton:hover {
+                background: rgba(139, 133, 255, 0.12);
+                color: #E8E5FF;
+            }
         """)
         self._refresh_btn.clicked.connect(self._start_report)
 
@@ -200,11 +218,15 @@ class WeeklyReportDialog(QDialog):
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet("""
             QPushButton {
-                background: transparent; color: #6B6880;
-                border: 1px solid #C0BDDE; border-radius: 8px;
+                background: transparent; color: #5C5880;
+                border: 1px solid rgba(92, 88, 128, 0.3);
+                border-radius: 8px;
                 padding: 6px 18px; font-size: 11px;
             }
-            QPushButton:hover { background: #F0EEF8; }
+            QPushButton:hover {
+                background: rgba(255, 107, 107, 0.12);
+                color: #FF6B6B;
+            }
         """)
         close_btn.clicked.connect(self.close)
 
@@ -220,11 +242,14 @@ class WeeklyReportDialog(QDialog):
     def _nav_btn_style() -> str:
         return """
             QPushButton {
-                background: rgba(108,99,255,0.08); color: #6C63FF;
-                border: 1px solid rgba(108,99,255,0.2);
+                background: rgba(139, 133, 255, 0.1); color: #8B85FF;
+                border: 1px solid rgba(139, 133, 255, 0.25);
                 border-radius: 6px; font-size: 11px;
             }
-            QPushButton:hover { background: rgba(108,99,255,0.18); }
+            QPushButton:hover {
+                background: rgba(139, 133, 255, 0.25);
+                color: #E8E5FF;
+            }
         """
 
     def _update_week_label(self) -> None:
@@ -256,6 +281,9 @@ class WeeklyReportDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _start_report(self) -> None:
+        # 如果上一个 worker 还在跑，先等它结束
+        self._stop_worker()
+
         self._content_browser.setMarkdown("⏳ AI 正在生成周报，请稍候…")
         self._copy_btn.setEnabled(False)
         self._report_text = ""
@@ -291,12 +319,29 @@ class WeeklyReportDialog(QDialog):
                         enriched_lines.append(f"- {t.title}: {'; '.join(extras)}")
         week_summary["enriched_info"] = "\n".join(enriched_lines)
 
-        worker = AIWorker(self._ai, parent=self)
+        # ⚠️ parent=None，避免弹窗析构时连带销毁正在运行的 QThread
+        worker = AIWorker(self._ai, parent=None)
         worker.generate_weekly_report(week_summary)
         worker.result_ready.connect(self._on_report_ready)
         worker.error_occurred.connect(self._on_report_error)
+        worker.finished.connect(self._on_worker_finished)
         worker.start()
         self._worker = worker
+
+    def _stop_worker(self) -> None:
+        """安全停止并清理 worker"""
+        if self._worker is not None:
+            try:
+                if self._worker.isRunning():
+                    self._worker.wait(5000)  # 最多等 5 秒
+                self._worker.deleteLater()
+            except RuntimeError:
+                pass  # C++ 对象已销毁
+            self._worker = None
+
+    def _on_worker_finished(self) -> None:
+        """Worker 完成后标记可清理"""
+        pass  # worker 保留引用直到下次 _start_report 或 close
 
     def _on_report_ready(self, task_type: str, result: object) -> None:
         if task_type != "weekly_report":
@@ -331,6 +376,15 @@ class WeeklyReportDialog(QDialog):
             QGuiApplication.clipboard().setText(self._report_text)
             self._copy_btn.setText("已复制 ✓")
             QTimer.singleShot(2000, lambda: self._copy_btn.setText("复制周报"))
+
+    # ------------------------------------------------------------------ #
+    #  安全关闭
+    # ------------------------------------------------------------------ #
+
+    def closeEvent(self, event) -> None:
+        """关闭弹窗前确保 AIWorker 子线程已停止，防止析构崩溃"""
+        self._stop_worker()
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------ #
     #  鼠标拖拽（弹窗可移动）

@@ -1,14 +1,19 @@
 """
-review_dialog.py - 今日复盘弹窗
+review_dialog.py - 今日复盘弹窗（v3，深色风格）
 
 展示 AI 生成的 Markdown 复盘报告，支持一键复制。
-风格：奶油白磨砂卡片，独立模态弹窗，最大高度 600px 内滚动。
+风格：深色卡片，与工具整体设计统一。
+
+安全关闭：弹窗关闭时等待 AIWorker 子线程结束，防止 QThread 运行中析构崩溃。
 """
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
-from PyQt6.QtGui import QFont, QClipboard, QGuiApplication
+import logging
+from datetime import date
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont, QGuiApplication
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QSizePolicy, QTextBrowser,
@@ -22,10 +27,12 @@ from data.report_repository import ReportRepository, Report
 from services.ai_service import AIService
 from services.ai_worker import AIWorker
 
+logger = logging.getLogger(__name__)
+
 
 class ReviewDialog(QDialog):
     """
-    今日复盘弹窗
+    今日复盘弹窗（深色风格）
 
     弹出时先展示加载占位，然后触发 AI 生成，
     结果回来后刷新内容区域。
@@ -49,7 +56,6 @@ class ReviewDialog(QDialog):
 
         self._setup_ui()
         # 延迟启动 AI 生成（等 exec() 进入事件循环后再开始，避免 COM 冲突）
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(300, self._start_review)
 
     # ------------------------------------------------------------------ #
@@ -71,14 +77,14 @@ class ReviewDialog(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
 
-        # ---- 卡片容器（不再依赖 WA_TranslucentBackground，直接做圆角卡片）----
+        # ---- 卡片容器（深色风格）----
         card = QWidget()
         card.setObjectName("ReviewCard")
         card.setStyleSheet("""
             #ReviewCard {
-                background: #FEFCF7;
-                border-radius: 16px;
-                border: 1px solid rgba(108, 99, 255, 0.18);
+                background: rgba(30, 27, 48, 0.98);
+                border-radius: 12px;
+                border: 1px solid rgba(139, 133, 255, 0.25);
             }
         """)
 
@@ -91,14 +97,14 @@ class ReviewDialog(QDialog):
         emoji_label = QLabel("📊")
         emoji_label.setFont(QFont("Segoe UI Emoji", 18))
         emoji_label.setFixedWidth(32)
+        emoji_label.setStyleSheet("background: transparent; border: none;")
 
         title_label = QLabel("今日复盘")
         title_label.setFont(QFont("Microsoft YaHei", 13, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #2D2B3D;")
+        title_label.setStyleSheet("color: #8B85FF; background: transparent; border: none;")
 
-        from datetime import date
         date_label = QLabel(date.today().strftime("%Y年%m月%d日"))
-        date_label.setStyleSheet("color: #A09DB8; font-size: 11px;")
+        date_label.setStyleSheet("color: #5C5880; font-size: 11px; background: transparent; border: none;")
         date_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         header_row.addWidget(emoji_label)
@@ -110,7 +116,8 @@ class ReviewDialog(QDialog):
         # 分割线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: rgba(108,99,255,0.15);")
+        line.setStyleSheet("color: rgba(139, 133, 255, 0.2); background: transparent; border: none; border-top: 1px solid rgba(139, 133, 255, 0.2);")
+        line.setFixedHeight(1)
         card_layout.addWidget(line)
 
         # ---- 内容滚动区 ----
@@ -121,7 +128,7 @@ class ReviewDialog(QDialog):
             QScrollArea { border: none; background: transparent; }
             QScrollBar:vertical { width: 4px; background: transparent; }
             QScrollBar::handle:vertical {
-                background: rgba(108,99,255,0.3); border-radius: 2px;
+                background: rgba(139, 133, 255, 0.35); border-radius: 2px;
             }
         """)
 
@@ -132,7 +139,7 @@ class ReviewDialog(QDialog):
             QTextBrowser {
                 background: transparent;
                 border: none;
-                color: #2D2B3D;
+                color: #E8E5FF;
             }
         """)
         self._content_browser.setMarkdown("⏳ AI 正在生成复盘报告，请稍候…")
@@ -148,13 +155,20 @@ class ReviewDialog(QDialog):
         self._copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._copy_btn.setStyleSheet("""
             QPushButton {
-                background: #6C63FF; color: white;
-                border: none; border-radius: 8px;
+                background: rgba(139, 133, 255, 0.25);
+                color: #8B85FF;
+                border: 1px solid rgba(139, 133, 255, 0.4);
+                border-radius: 8px;
                 padding: 6px 18px; font-size: 11px;
             }
-            QPushButton:hover { background: #8B85FF; }
+            QPushButton:hover {
+                background: rgba(139, 133, 255, 0.4);
+                color: #E8E5FF;
+            }
             QPushButton:disabled {
-                background: #D4D1F0; color: #A09DB8;
+                background: rgba(60, 55, 85, 0.5);
+                color: #5C5880;
+                border: 1px solid rgba(92, 88, 128, 0.3);
             }
         """)
         self._copy_btn.clicked.connect(self._on_copy)
@@ -163,11 +177,15 @@ class ReviewDialog(QDialog):
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet("""
             QPushButton {
-                background: transparent; color: #6B6880;
-                border: 1px solid #C0BDDE; border-radius: 8px;
+                background: transparent; color: #5C5880;
+                border: 1px solid rgba(92, 88, 128, 0.3);
+                border-radius: 8px;
                 padding: 6px 18px; font-size: 11px;
             }
-            QPushButton:hover { background: #F0EEF8; }
+            QPushButton:hover {
+                background: rgba(255, 107, 107, 0.12);
+                color: #FF6B6B;
+            }
         """)
         close_btn.clicked.connect(self.close)
 
@@ -183,18 +201,38 @@ class ReviewDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _start_review(self) -> None:
+        # 如果上一个 worker 还在跑，先等它结束
+        self._stop_worker()
+
         done_tasks = self._enrich_tasks(self._task_repo.get_today_done(), done=True)
         undone_tasks = self._enrich_tasks(
             self._task_repo.get_today(include_done=False), done=False
         )
 
-        worker = AIWorker(self._ai, parent=self)
+        # ⚠️ parent=None，避免弹窗析构时连带销毁正在运行的 QThread
+        worker = AIWorker(self._ai, parent=None)
         worker.generate_daily_review(done_tasks, undone_tasks)
         worker.result_ready.connect(self._on_review_ready)
         worker.error_occurred.connect(self._on_review_error)
         worker.progress_updated.connect(self._on_progress)
+        worker.finished.connect(self._on_worker_finished)
         worker.start()
         self._worker = worker
+
+    def _stop_worker(self) -> None:
+        """安全停止并清理 worker"""
+        if self._worker is not None:
+            try:
+                if self._worker.isRunning():
+                    self._worker.wait(5000)  # 最多等 5 秒
+                self._worker.deleteLater()
+            except RuntimeError:
+                pass  # C++ 对象已销毁
+            self._worker = None
+
+    def _on_worker_finished(self) -> None:
+        """Worker 完成后标记可清理"""
+        pass  # worker 保留引用直到下次 _start_review 或 close
 
     def _enrich_tasks(self, tasks, done: bool) -> list[dict]:
         """为每个任务收集 task_notes 信息（文字/图片/链接/文档）"""
@@ -252,10 +290,9 @@ class ReviewDialog(QDialog):
         self._content_browser.setMarkdown(text)
         self._copy_btn.setEnabled(True)
         # 自动保存到 reports 表
-        from datetime import date as _date
         self._report_repo.save_report(Report(
             report_type="daily",
-            report_date=_date.today().isoformat(),
+            report_date=date.today().isoformat(),
             content=text,
             auto_generated=False,
         ))
@@ -275,8 +312,16 @@ class ReviewDialog(QDialog):
         if self._report_text:
             QGuiApplication.clipboard().setText(self._report_text)
             self._copy_btn.setText("已复制 ✓")
-            from PyQt6.QtCore import QTimer
             QTimer.singleShot(2000, lambda: self._copy_btn.setText("复制报告"))
+
+    # ------------------------------------------------------------------ #
+    #  安全关闭
+    # ------------------------------------------------------------------ #
+
+    def closeEvent(self, event) -> None:
+        """关闭弹窗前确保 AIWorker 子线程已停止，防止析构崩溃"""
+        self._stop_worker()
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------ #
     #  鼠标拖拽（弹窗可移动）
