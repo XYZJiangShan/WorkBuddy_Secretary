@@ -18,7 +18,7 @@ from PyQt6.QtCore import (
     QPoint, QSize, Qt, pyqtSignal, QTimer,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QLinearGradient,
+    QColor, QFont, QLinearGradient, QIcon, QPainterPath,
     QPainter, QPaintEvent, QPen, QBrush, QCursor,
 )
 from PyQt6.QtWidgets import (
@@ -49,11 +49,10 @@ class FloatingWindow(QWidget):
 
     Signals:
         open_settings()
-        open_review()
+        open_weekly_report()
     """
 
     open_settings = pyqtSignal()
-    open_review = pyqtSignal()
     open_weekly_report = pyqtSignal()
 
     def __init__(
@@ -200,41 +199,22 @@ class FloatingWindow(QWidget):
         row.addWidget(self._title_label)
         row.addStretch()
 
-        # 功能按钮组
-        self._stats_btn = self._make_icon_btn("📊", "今日统计")
-        self._history_btn = self._make_icon_btn("📋", "历史任务记录")
-        self._weekly_btn = self._make_icon_btn("📝", "周报")
-        self._settings_btn = self._make_icon_btn("⚙", "打开设置")
-        self._close_btn = self._make_icon_btn("✕", "最小化到托盘")
-        self._close_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent; border: none;
-                color: #A09DB8; font-size: 12px;
-                width: 24px; height: 24px; border-radius: 5px;
-            }
-            QPushButton:hover { background: rgba(255,107,107,0.15); color: #FF6B6B; }
-        """)
+        # 功能按钮组 —— 使用自绘图标
+        self._stats_btn = IconButton("stats", "统计", bar)
+        self._history_btn = IconButton("history", "历史", bar)
+        self._weekly_btn = IconButton("report", "周报", bar)
+        self._settings_btn = IconButton("settings", "设置", bar)
+        self._close_btn = IconButton("close", "最小化", bar)
+        self._close_btn.set_hover_color("#FF6B6B", "rgba(255,107,107,0.15)")
 
-        for btn in [self._stats_btn, self._history_btn,
-                    self._weekly_btn, self._settings_btn]:
+        self._icon_btns = [self._stats_btn, self._history_btn,
+                           self._weekly_btn, self._settings_btn]
+
+        for btn in self._icon_btns:
             row.addWidget(btn)
         row.addWidget(self._close_btn)
 
         return bar
-
-    def _make_icon_btn(self, text: str, tooltip: str) -> QPushButton:
-        btn = QPushButton(text)
-        btn.setToolTip(tooltip)
-        btn.setFixedSize(QSize(24, 24))
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet("""
-            QPushButton {
-                background: transparent; border: none;
-                color: #A09DB8; font-size: 12px; border-radius: 5px;
-            }
-            QPushButton:hover { background: rgba(108,99,255,0.12); color: #6C63FF; }
-        """)
-        return btn
 
     # ------------------------------------------------------------------ #
     #  信号连接
@@ -253,7 +233,6 @@ class FloatingWindow(QWidget):
         self._task_list.task_confirmed.connect(self._on_task_confirmed)
         self._task_list.task_check_toggled.connect(self._on_task_check_toggled)
         self._task_list.task_deleted.connect(self._on_task_deleted)
-        self._task_list.review_requested.connect(self.open_review)
         self._task_list.task_detail_requested.connect(self._on_task_detail_requested)
         self._task_list.task_priority_changed.connect(self._on_task_priority_changed)
 
@@ -319,24 +298,9 @@ class FloatingWindow(QWidget):
         self._title_label.setStyleSheet("color: #8B85FF; background: transparent; letter-spacing: 1px;")
 
         # ---- 标题栏按钮（统一颜色）----
-        btn_style = f"""
-            QPushButton {{
-                background: transparent; border: none;
-                color: {theme.text_placeholder}; font-size: 12px; border-radius: 5px;
-            }}
-            QPushButton:hover {{ background: rgba(108,99,255,0.15); color: {theme.accent}; }}
-        """
-        for btn in [self._stats_btn, self._history_btn,
-                    self._weekly_btn, self._settings_btn]:
-            btn.setStyleSheet(btn_style)
-        self._close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; border: none;
-                color: {theme.text_placeholder}; font-size: 12px;
-                width: 24px; height: 24px; border-radius: 5px;
-            }}
-            QPushButton:hover {{ background: rgba(255,107,107,0.15); color: #FF6B6B; }}
-        """)
+        for btn in self._icon_btns:
+            btn.apply_theme(theme)
+        self._close_btn.apply_theme(theme)
 
         # ---- 进度条 ----
         self._progress_bar.apply_theme(theme)
@@ -732,6 +696,157 @@ class FloatingWindow(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         pass  # 透明背景，无需绘制阴影外圈
+
+
+# --------------------------------------------------------------------------- #
+#  自绘图标按钮（替代 emoji，保证视觉一致性）
+# --------------------------------------------------------------------------- #
+
+class IconButton(QPushButton):
+    """标题栏自绘矢量图标按钮，悬浮显示 tooltip 名称"""
+
+    _ICONS = {
+        "stats": "_draw_stats",
+        "history": "_draw_history",
+        "report": "_draw_report",
+        "settings": "_draw_settings",
+        "close": "_draw_close",
+    }
+
+    def __init__(self, icon_key: str, tooltip: str, parent=None):
+        super().__init__(parent)
+        self._icon_key = icon_key
+        self._draw_fn = self._ICONS.get(icon_key, "_draw_close")
+        self.setToolTip(tooltip)
+        self.setFixedSize(QSize(26, 26))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._fg_color = QColor("#A09DB8")
+        self._hover_fg = QColor("#6C63FF")
+        self._hover_bg = QColor(108, 99, 255, 30)  # rgba(108,99,255,0.12)
+        self._hovered = False
+        self.setStyleSheet("background: transparent; border: none;")
+
+    def set_hover_color(self, fg: str, bg: str) -> None:
+        self._hover_fg = QColor(fg)
+        self._hover_bg = QColor(bg) if bg else QColor(0, 0, 0, 0)
+
+    def apply_theme(self, theme) -> None:
+        self._fg_color = QColor(theme.text_placeholder)
+        # 保留自定义 hover 颜色（如 close 按钮的红色）
+        if self._icon_key != "close":
+            self._hover_fg = QColor(theme.accent)
+        self.update()
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        # 悬浮背景
+        if self._hovered:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(self._hover_bg)
+            p.drawRoundedRect(0, 0, w, h, 5, 5)
+
+        # 图标颜色
+        color = self._hover_fg if self._hovered else self._fg_color
+        pen = QPen(color, 1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+
+        # 绘制区域：在 26x26 里居中 14x14
+        ox, oy = (w - 14) / 2, (h - 14) / 2
+        getattr(self, self._draw_fn)(p, ox, oy, 14, 14)
+        p.end()
+
+    # ---- 各图标绘制方法（14x14 画布） ---- #
+
+    def _draw_stats(self, p: QPainter, x, y, w, h):
+        """三竖条柱状图"""
+        bar_w = 2.5
+        gap = (w - bar_w * 3) / 4
+        heights = [0.4, 0.75, 0.55]
+        for i, ratio in enumerate(heights):
+            bx = x + gap + i * (bar_w + gap)
+            bh = h * ratio
+            by = y + h - bh
+            p.drawRoundedRect(int(bx), int(by), int(bar_w), int(bh), 1, 1)
+        # 底线
+        p.drawLine(int(x + 1), int(y + h - 0.5), int(x + w - 1), int(y + h - 0.5))
+
+    def _draw_history(self, p: QPainter, x, y, w, h):
+        """时钟 + 回溯箭头"""
+        import math
+        cx, cy = x + w / 2, y + h / 2
+        r = min(w, h) / 2 - 1
+        # 圆
+        p.drawEllipse(int(cx - r), int(cy - r), int(r * 2), int(r * 2))
+        # 时针 (12点方向偏右)
+        p.drawLine(int(cx), int(cy), int(cx), int(cy - r * 0.55))
+        # 分针 (3点方向)
+        p.drawLine(int(cx), int(cy), int(cx + r * 0.45), int(cy))
+        # 回溯箭头（左上角小箭头）
+        ax = cx - r * 0.7
+        ay = cy - r * 0.7
+        al = 2.5
+        p.drawLine(int(ax), int(ay), int(ax + al), int(ay))
+        p.drawLine(int(ax), int(ay), int(ax), int(ay + al))
+
+    def _draw_report(self, p: QPainter, x, y, w, h):
+        """文档图标（折角纸张 + 横线）"""
+        # 纸张轮廓（带折角）
+        fold = 3.5
+        path = QPainterPath()
+        path.moveTo(x + 2, y)
+        path.lineTo(x + w - 2 - fold, y)
+        path.lineTo(x + w - 2, y + fold)
+        path.lineTo(x + w - 2, y + h)
+        path.lineTo(x + 2, y + h)
+        path.closeSubpath()
+        p.drawPath(path)
+        # 折角线
+        p.drawLine(int(x + w - 2 - fold), int(y), int(x + w - 2 - fold), int(y + fold))
+        p.drawLine(int(x + w - 2 - fold), int(y + fold), int(x + w - 2), int(y + fold))
+        # 横线
+        lx1, lx2 = x + 4.5, x + w - 4.5
+        for ly in [y + h * 0.36, y + h * 0.54, y + h * 0.72]:
+            p.drawLine(int(lx1), int(ly), int(lx2), int(ly))
+
+    def _draw_settings(self, p: QPainter, x, y, w, h):
+        """齿轮图标"""
+        import math
+        cx, cy = x + w / 2, y + h / 2
+        r_outer = min(w, h) / 2 - 0.5
+        r_inner = r_outer * 0.55
+        teeth = 6
+        # 中心圆
+        p.drawEllipse(int(cx - r_inner), int(cy - r_inner), int(r_inner * 2), int(r_inner * 2))
+        # 齿
+        for i in range(teeth):
+            angle = math.radians(i * 60)
+            x1 = cx + r_inner * 0.9 * math.cos(angle)
+            y1 = cy + r_inner * 0.9 * math.sin(angle)
+            x2 = cx + r_outer * math.cos(angle)
+            y2 = cy + r_outer * math.sin(angle)
+            p.drawLine(int(x1), int(y1), int(x2), int(y2))
+
+    def _draw_close(self, p: QPainter, x, y, w, h):
+        """×"""
+        m = 3.5
+        p.drawLine(int(x + m), int(y + m), int(x + w - m), int(y + h - m))
+        p.drawLine(int(x + w - m), int(y + m), int(x + m), int(y + h - m))
 
 
 # --------------------------------------------------------------------------- #

@@ -470,14 +470,12 @@ class TaskListWidget(QWidget):
         task_confirmed(parsed: dict)    用户确认解析结果，请求添加任务
         task_check_toggled(id, done)    勾选状态变化
         task_deleted(id)                删除任务
-        review_requested()              用户点击"今日复盘"
     """
 
     task_add_requested = pyqtSignal(str)
     task_confirmed = pyqtSignal(dict)
     task_check_toggled = pyqtSignal(int, bool)
     task_deleted = pyqtSignal(int)
-    review_requested = pyqtSignal()
     task_detail_requested = pyqtSignal(int, int, int)  # (task_id, global_x, global_bottom_y)
     task_priority_changed = pyqtSignal(int, str)        # (task_id, new_priority)
 
@@ -509,26 +507,9 @@ class TaskListWidget(QWidget):
         self._count_label = QLabel("0 项")
         self._count_label.setStyleSheet("color: #A09DB8; font-size: 10px;")
 
-        review_btn = QPushButton("今日复盘 ✨")
-        review_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        review_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: 1px solid #C0BDDE;
-                border-radius: 5px;
-                color: #6C63FF;
-                font-size: 10px;
-                padding: 2px 8px;
-            }
-            QPushButton:hover { background: #F0EEF8; }
-        """)
-        review_btn.clicked.connect(self.review_requested)
-        self._review_btn = review_btn   # 保存引用，供 set_ai_mode 使用
-
         header.addWidget(today_label)
         header.addWidget(self._count_label)
         header.addStretch()
-        header.addWidget(review_btn)
         root.addLayout(header)
 
         # ---- 分隔线 ----
@@ -632,16 +613,12 @@ class TaskListWidget(QWidget):
 
     def set_ai_mode(self, enabled: bool) -> None:
         """
-        切换 AI 模式（仅影响复盘/AI 文案等功能，输入框始终直接添加任务）。
-        enabled=True  → 显示复盘按钮
-        enabled=False → 隐藏复盘按钮和 AI 相关 UI
+        切换 AI 模式（仅影响 AI 文案等功能，输入框始终直接添加任务）。
         """
         self._ai_mode = enabled
         if enabled:
-            self._review_btn.show()
             self._loading_label.hide()
         else:
-            self._review_btn.hide()
             self._loading_label.hide()
             self._parse_card.hide()
 
@@ -753,19 +730,6 @@ class TaskListWidget(QWidget):
         self._count_label.setStyleSheet(
             f"color: {theme.text_placeholder}; font-size: 10px; background: transparent;"
         )
-
-        # 复盘按钮
-        self._review_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
-                border: 1px solid {theme.border_accent};
-                border-radius: 5px;
-                color: {theme.accent};
-                font-size: 10px;
-                padding: 2px 8px;
-            }}
-            QPushButton:hover {{ background: rgba(108,99,255,0.12); }}
-        """)
 
         # 分隔线
         self._divider.setStyleSheet(f"color: {theme.border};")

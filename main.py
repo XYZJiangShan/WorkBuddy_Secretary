@@ -186,9 +186,6 @@ def main() -> int:
         lambda: _open_settings(settings, ai_service, reminder_service,
                                hotkey_service, sync_service, main_window)
     )
-    main_window.open_review.connect(
-        lambda: _open_review(ai_service, task_repo, settings, reminder_service, main_window)
-    )
     main_window.open_weekly_report.connect(
         lambda: _open_weekly_report(ai_service, task_repo, settings, reminder_service)
     )
@@ -268,15 +265,6 @@ def _open_settings(settings, ai_service, reminder_service,
         dialog.setWindowTitle("欢迎使用小秘书 - 请先配置 AI")
     dialog.raise_()
     dialog.activateWindow()
-    dialog.exec()
-
-
-def _open_review(ai_service, task_repo, settings, reminder_service, parent):
-    # ⚠️ 必须在 QDialog.exec() 之前等待 AI 子线程完成，避免 COM 冲突崩溃
-    reminder_service.wait_ai_idle()
-    from ui.review_dialog import ReviewDialog
-    # parent=None 避免继承 FloatingWindow 的 WA_TranslucentBackground 导致 COM 崩溃
-    dialog = ReviewDialog(ai_service, task_repo, settings, parent=None)
     dialog.exec()
 
 

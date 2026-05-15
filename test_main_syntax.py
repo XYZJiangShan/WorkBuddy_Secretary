@@ -17,7 +17,6 @@ app = QApplication(sys.argv)
 import main as m
 print("main.py import OK")
 print("_open_settings:", m._open_settings)
-print("_open_review:  ", m._open_review)
 
 print("\n全量模块导入 PASSED!")
 app.quit()
