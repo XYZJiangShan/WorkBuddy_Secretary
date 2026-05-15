@@ -73,7 +73,9 @@ class WeeklyReportDialog(QDialog):
         # ⚠️ 不能延迟用 setWindowFlag()：它会 destroy+recreate 窗口，
         #    打断 exec() 的模态事件循环，导致弹窗一闪而过。
         self.setWindowFlags(
-            Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Dialog
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.FramelessWindowHint
         )
 
         root = QVBoxLayout(self)
