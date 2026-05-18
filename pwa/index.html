@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DeskSec">
+  <meta name="theme-color" content="#1A1730">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <title>桌面小秘书</title>
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部状态栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">✦</span>
+        <span class="brand-name">DeskSec</span>
+      </div>
+      <div class="actions">
+        <button id="btn-config" class="icon-btn" title="配置">⚙</button>
+        <button id="btn-sync" class="icon-btn" title="刷新">↻</button>
+      </div>
+    </header>
+
+    <!-- 统计卡片 -->
+    <section class="stats-card">
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="stat-value" id="stat-total">-</div>
+          <div class="stat-label">今日</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-done">-</div>
+          <div class="stat-label">已完成</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-undone">-</div>
+          <div class="stat-label">待办</div>
+        </div>
+      </div>
+      <div class="sync-info" id="sync-info">未同步</div>
+    </section>
+
+    <!-- 任务列表 -->
+    <main class="task-list" id="task-list">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">点右上角 ⚙ 配置 GitHub 仓库后即可同步</div>
+      </div>
+    </main>
+
+    <!-- 浮动添加按钮 -->
+    <button id="btn-add" class="fab" title="添加任务">+</button>
+
+    <!-- 添加任务弹窗 -->
+    <div class="modal" id="modal-add" style="display:none;">
+      <div class="modal-content">
+        <h3>添加任务</h3>
+        <input type="text" id="input-title" placeholder="任务标题..." maxlength="200">
+        <div class="priority-row">
+          <label>优先级：</label>
+          <select id="input-priority">
+            <option value="high">高</option>
+            <option value="medium" selected>中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeAddModal()">取消</button>
+          <button class="btn-primary" id="btn-confirm-add">添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 配置弹窗 -->
+    <div class="modal" id="modal-config" style="display:none;">
+      <div class="modal-content">
+        <h3>同步配置</h3>
+        <div class="config-group">
+          <label>GitHub 用户名</label>
+          <input type="text" id="cfg-owner" placeholder="例如 XYZJiangShan">
+        </div>
+        <div class="config-group">
+          <label>仓库名</label>
+          <input type="text" id="cfg-repo" placeholder="例如 WorkBuddy_Secretary">
+        </div>
+        <div class="config-group">
+          <label>分支（默认 main）</label>
+          <input type="text" id="cfg-branch" placeholder="main">
+        </div>
+        <div class="config-group">
+          <label>Personal Access Token</label>
+          <input type="password" id="cfg-token" placeholder="ghp_xxx (需 repo 权限)">
+          <div class="hint">用于添加任务时回写 inbox.json，纯查看可留空</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeConfigModal()">取消</button>
+          <button class="btn-primary" id="btn-save-config">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="toast" style="display:none;"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

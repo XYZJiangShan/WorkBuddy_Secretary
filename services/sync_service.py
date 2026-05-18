@@ -17,6 +17,7 @@ GitHub 私有仓库，实现多设备数据共享。
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -32,6 +33,9 @@ logger = logging.getLogger(__name__)
 
 # 同步仓库中 db 文件的相对路径
 _REMOTE_DB_PATH = "desk_secretary.db"
+# PWA 数据交换文件
+_REMOTE_TASKS_JSON = "tasks.json"     # 电脑端导出，给手机 PWA 读
+_REMOTE_INBOX_JSON = "inbox.json"     # 手机端写入新任务，电脑端拉回合并
 
 
 class SyncResult:
@@ -152,12 +156,20 @@ class SyncService(QObject):
                 else:
                     logger.info("No remote DB found, skip pull")
 
+                # 处理手机端写入的 inbox.json（合并新任务 + 清空）
+                inbox_file = repo_dir / _REMOTE_INBOX_JSON
+                if inbox_file.exists():
+                    self._consume_inbox(inbox_file)
+
             if direction in ("push", "both"):
                 if not local_db.exists():
                     return SyncResult(False, "本地数据库文件不存在，无法推送")
 
                 # 复制 db 到仓库目录
                 shutil.copy2(str(local_db), str(remote_db))
+
+                # 导出 tasks.json（给手机 PWA 读）
+                self._export_tasks_json(repo_dir / _REMOTE_TASKS_JSON)
 
                 # git config（临时）
                 self._git(["config", "user.name", "DeskSecretary"], cwd=repo_dir)
@@ -171,11 +183,11 @@ class SyncService(QObject):
                     return result
 
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                self._git(["add", _REMOTE_DB_PATH], cwd=repo_dir)
+                self._git(["add", "-A"], cwd=repo_dir)
                 self._git(["commit", "-m", f"sync: auto backup {now_str}"], cwd=repo_dir)
                 self._git(["push"], cwd=repo_dir)
                 self._update_last_sync_time()
-                logger.info("DB pushed to GitHub")
+                logger.info("DB+tasks.json pushed to GitHub")
 
             msg = ""
             if direction == "pull":
@@ -228,6 +240,100 @@ class SyncService(QObject):
     def _remote_is_newer(remote: Path, local: Path) -> bool:
         """简单判断：文件大小不同则认为远端更新（可换成 hash 对比）"""
         return remote.stat().st_size != local.stat().st_size
+
+    # ------------------------------------------------------------------ #
+    #  PWA 数据交换
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _export_tasks_json(target: Path) -> None:
+        """
+        将本地任务数据导出为 tasks.json，供 PWA 读取。
+        包含今日任务列表 + 简单统计。
+        """
+        try:
+            from data.task_repository import TaskRepository
+            repo = TaskRepository()
+            today_tasks = repo.get_today(include_done=True)
+            stats = repo.count_today()
+
+            payload = {
+                "exported_at": datetime.now().isoformat(timespec="seconds"),
+                "stats": stats,
+                "today": [
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "priority": t.priority,
+                        "due_time": t.due_time,
+                        "done": t.done,
+                        "created_at": t.created_at,
+                        "done_at": t.done_at,
+                    }
+                    for t in today_tasks
+                ],
+            }
+            target.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            logger.info("tasks.json exported (%d items)", len(today_tasks))
+        except Exception as e:
+            logger.error("export tasks.json failed: %s", e)
+
+    @staticmethod
+    def _consume_inbox(inbox_file: Path) -> int:
+        """
+        读取手机端写入的 inbox.json，将新任务合并到本地 SQLite，
+        然后清空文件（写入空数组）。返回合并的任务数量。
+
+        inbox.json 格式：
+        [
+          {"client_id": "uuid-xxx", "title": "...", "priority": "medium",
+           "created_at": "2026-05-18T20:00:00"}
+        ]
+        """
+        try:
+            text = inbox_file.read_text(encoding="utf-8").strip()
+            if not text:
+                return 0
+            items = json.loads(text)
+            if not isinstance(items, list) or not items:
+                return 0
+
+            from data.task_repository import TaskRepository, Task
+            repo = TaskRepository()
+            count = 0
+            for it in items:
+                try:
+                    title = (it.get("title") or "").strip()
+                    if not title:
+                        continue
+                    priority = it.get("priority", "medium")
+                    if priority not in ("high", "medium", "low"):
+                        priority = "medium"
+                    created_at = it.get("created_at") or datetime.now().isoformat(
+                        sep=" ", timespec="seconds"
+                    )
+                    # 标准化为本地存储格式
+                    created_at = created_at.replace("T", " ")[:19]
+                    repo.add(Task(
+                        title=title,
+                        priority=priority,
+                        due_time=it.get("due_time"),
+                        created_at=created_at,
+                    ))
+                    count += 1
+                except Exception as e:
+                    logger.warning("skip inbox item %s: %s", it, e)
+
+            # 清空 inbox（写入空数组，保留文件方便手机端继续追加）
+            inbox_file.write_text("[]", encoding="utf-8")
+            logger.info("inbox.json consumed: %d tasks merged", count)
+            return count
+        except Exception as e:
+            logger.error("consume inbox failed: %s", e)
+            return 0
 
     @staticmethod
     def _git(args: list, cwd: Optional[Path] = None) -> None:

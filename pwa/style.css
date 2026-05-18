@@ -1,0 +1,381 @@
+/* ==========================================================================
+   DeskSecretary PWA — 移动端样式（深色主题，与桌面端一致）
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  color: #E8E6F5;
+  background: #1A1730;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
+}
+
+.app {
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: relative;
+}
+
+/* ---------- 顶部栏 ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 14px) 18px 14px;
+  background: linear-gradient(180deg, #2A2548 0%, #1A1730 100%);
+  border-bottom: 1px solid rgba(108, 99, 255, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  color: #8B85FF;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.brand-name {
+  color: #8B85FF;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #A09DB8;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.icon-btn:active {
+  background: rgba(108, 99, 255, 0.2);
+}
+
+/* ---------- 统计卡片 ---------- */
+.stats-card {
+  margin: 14px 14px 8px;
+  padding: 16px 14px 12px;
+  background: linear-gradient(135deg, #2A2548 0%, #221E3D 100%);
+  border: 1px solid rgba(108, 99, 255, 0.2);
+  border-radius: 12px;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 8px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 600;
+  color: #8B85FF;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #A09DB8;
+  margin-top: 2px;
+}
+
+.sync-info {
+  text-align: center;
+  font-size: 11px;
+  color: #6F6B8C;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(108, 99, 255, 0.15);
+}
+
+/* ---------- 任务列表 ---------- */
+.task-list {
+  padding: 4px 14px 100px;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px;
+  margin-bottom: 8px;
+  background: #221E3D;
+  border: 1px solid rgba(108, 99, 255, 0.12);
+  border-radius: 10px;
+  transition: transform 0.15s;
+}
+
+.task-item:active {
+  transform: scale(0.98);
+}
+
+.task-item.done {
+  opacity: 0.5;
+}
+
+.task-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #6C63FF;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6C63FF;
+  margin-top: 1px;
+}
+
+.task-item.done .task-checkbox {
+  background: #6C63FF;
+  color: #fff;
+}
+
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  font-size: 14px;
+  color: #E8E6F5;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.task-item.done .task-title {
+  text-decoration: line-through;
+  color: #6F6B8C;
+}
+
+.task-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6F6B8C;
+}
+
+.priority-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.priority-tag.high   { background: rgba(255, 107, 107, 0.15); color: #FF8A8A; }
+.priority-tag.medium { background: rgba(108, 99, 255, 0.15); color: #8B85FF; }
+.priority-tag.low    { background: rgba(120, 120, 140, 0.15); color: #A09DB8; }
+
+/* ---------- 空状态 ---------- */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px 30px;
+  color: #6F6B8C;
+}
+
+.empty-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.empty-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------- 浮动按钮 ---------- */
+.fab {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 24px);
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B85FF 0%, #6C63FF 100%);
+  color: #fff;
+  font-size: 28px;
+  border: none;
+  box-shadow: 0 6px 18px rgba(108, 99, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.fab:active {
+  transform: scale(0.92);
+}
+
+/* ---------- 弹窗 ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 400px;
+  background: #2A2548;
+  border: 1px solid rgba(108, 99, 255, 0.25);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.modal-content h3 {
+  color: #E8E6F5;
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+
+.modal-content input,
+.modal-content select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1A1730;
+  border: 1px solid rgba(108, 99, 255, 0.2);
+  border-radius: 8px;
+  color: #E8E6F5;
+  font-size: 14px;
+  margin-bottom: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.modal-content input:focus,
+.modal-content select:focus {
+  outline: none;
+  border-color: #6C63FF;
+}
+
+.priority-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.priority-row label {
+  color: #A09DB8;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.priority-row select {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.config-group {
+  margin-bottom: 12px;
+}
+
+.config-group label {
+  display: block;
+  font-size: 12px;
+  color: #A09DB8;
+  margin-bottom: 4px;
+}
+
+.config-group input {
+  margin-bottom: 0;
+}
+
+.hint {
+  font-size: 11px;
+  color: #6F6B8C;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #8B85FF 0%, #6C63FF 100%);
+  color: #fff;
+  font-weight: 500;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  color: #A09DB8;
+}
+
+.btn-primary:active,
+.btn-secondary:active {
+  opacity: 0.8;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 90px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(42, 37, 72, 0.95);
+  color: #E8E6F5;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  z-index: 200;
+  white-space: nowrap;
+  max-width: 80vw;
+}
