@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import QApplication, QWidget
 logger = logging.getLogger(__name__)
 
 SNAP_THRESHOLD = 40      # 距屏幕边缘多少像素触发吸附
-MINI_H = 10              # 迷你条高度（极致紧凑，无文字）
+MINI_H = 14              # 迷你条高度（紧凑但可放装饰元素，避免极薄窗口的渲染问题）
 MINI_W = 220             # 迷你条参考宽度（实际全宽由窗口决定）
 HOVER_EXPAND_DELAY = 80  # 悬浮 80ms 后展开
 AUTO_COLLAPSE_DELAY = 100   # 鼠标离开 100ms 后折叠
@@ -341,21 +341,54 @@ class MiniBar(QWidget):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        # 关闭抗锯齿：直角矩形避免边缘出现半透明像素被 setWindowOpacity 渲染成白边
+        # 关闭抗锯齿：直角矩形避免边缘出现半透明像素
         p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         w, h = self.width(), self.height()
 
-        # 纯色不透明实心矩形（无圆角、无任何渐变/指示线），撑满整条迷你区域
-        # 注意：
-        # 1. 必须用不透明颜色（alpha=255），否则透明区会被 windowOpacity 渲染成白边
-        # 2. 不要再画底部 accent 渐变线——layered window + 高 DPI 下，2px 的紫蓝渐变
-        #    会在窗口底部呈现"向下渗出/拖尾"的错觉光晕
+        # ---- 1) 背景：纵向渐变（顶亮底暗，营造质感）----
+        # 关键约束：所有像素必须 alpha=255，禁止贴近窗口边缘画彩色装饰
+        bg_grad = QLinearGradient(0, 0, 0, h)
         if self._is_dark:
-            bg = QColor(30, 27, 50)
+            bg_grad.setColorAt(0.0, QColor(38, 33, 62))      # 顶部稍亮
+            bg_grad.setColorAt(1.0, QColor(22, 19, 42))      # 底部深沉
+            accent = QColor(139, 133, 255)                    # 品牌紫 #8B85FF
+            # 预混色：品牌色 30% 叠加在背景顶部色上（避免使用 alpha）
+            highlight = QColor(60, 55, 120)                   # 偏紫的亮色
         else:
-            bg = QColor(240, 238, 248)
+            bg_grad.setColorAt(0.0, QColor(248, 246, 255))
+            bg_grad.setColorAt(1.0, QColor(228, 224, 245))
+            accent = QColor(108, 99, 255)                     # 品牌紫 #6C63FF
+            highlight = QColor(200, 195, 240)                 # 偏紫的浅亮色
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(bg))
+        p.setBrush(QBrush(bg_grad))
         p.drawRect(0, 0, w, h)
+
+        # ---- 2) 顶部 1px 高光线（不透明预混色，营造玻璃感）----
+        # 距离左右边缘各 12px，避免贴边外溢
+        p.setBrush(QBrush(highlight))
+        p.drawRect(12, 0, w - 24, 1)
+
+        # ---- 3) 左右对称品牌色装饰小块（距边缘 8px，距上下各 4px）----
+        # 永远不贴近任何窗口边缘 —— layered window 渲染安全
+        block_w = 28
+        block_h = h - 8         # 上下各留 4px 边距
+        margin = 8              # 距左右边缘 8px
+        p.setBrush(QBrush(accent))
+        p.drawRect(margin, 4, block_w, block_h)
+        p.drawRect(w - margin - block_w, 4, block_w, block_h)
+
+        # ---- 4) 中心提醒进度（仅当倒计时 < 30% 时显示，作为"即将触发"提示）----
+        if self._reminder_ratio < 0.3:
+            center_y = h // 2
+            # 可填充区域：左右两个 block + margin + 8px 间距
+            inner_left = margin + block_w + 8
+            inner_right = w - margin - block_w - 8
+            inner_w = max(0, inner_right - inner_left)
+            fill_w = int(inner_w * (1.0 - self._reminder_ratio / 0.3))
+            fill_w = max(0, min(fill_w, inner_w))
+            if fill_w > 0:
+                start_x = inner_left + (inner_w - fill_w) // 2
+                p.setBrush(QBrush(accent))
+                p.drawRect(start_x, center_y - 1, fill_w, 2)
 
         p.end()
