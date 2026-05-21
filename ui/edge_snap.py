@@ -345,8 +345,11 @@ class MiniBar(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         w, h = self.width(), self.height()
 
-        # 背景：不透明实心矩形（无圆角），撑满整条迷你区域
-        # 注意：必须用不透明颜色（alpha=255），否则透明区会被 windowOpacity 渲染成白边
+        # 纯色不透明实心矩形（无圆角、无任何渐变/指示线），撑满整条迷你区域
+        # 注意：
+        # 1. 必须用不透明颜色（alpha=255），否则透明区会被 windowOpacity 渲染成白边
+        # 2. 不要再画底部 accent 渐变线——layered window + 高 DPI 下，2px 的紫蓝渐变
+        #    会在窗口底部呈现"向下渗出/拖尾"的错觉光晕
         if self._is_dark:
             bg = QColor(30, 27, 50)
         else:
@@ -354,12 +357,5 @@ class MiniBar(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(bg))
         p.drawRect(0, 0, w, h)
-
-        # 底部品牌色指示线（2px）—— 直角矩形
-        accent = QLinearGradient(0, 0, w, 0)
-        accent.setColorAt(0, QColor("#8B85FF"))
-        accent.setColorAt(1, QColor("#6C63FF"))
-        p.setBrush(QBrush(accent))
-        p.drawRect(0, h - 2, w, 2)
 
         p.end()
