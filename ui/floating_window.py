@@ -126,7 +126,7 @@ class FloatingWindow(QWidget):
             self._dwm_shadow_disabled = True
 
     def _disable_dwm_shadow(self) -> None:
-        """通过 Win32 DWM API 关闭窗口投影（DWMWA_NCRENDERING_POLICY=DWMNCRP_DISABLED）"""
+        """通过 Win32 DWM API 关闭窗口投影 + Win11 自动圆角"""
         try:
             import sys
             if sys.platform != "win32":
@@ -134,18 +134,34 @@ class FloatingWindow(QWidget):
             import ctypes
             from ctypes import wintypes
             hwnd = int(self.winId())
+            dwmapi = ctypes.windll.dwmapi
+
+            # 1) 关闭非客户区渲染（窗口投影/阴影）
             DWMWA_NCRENDERING_POLICY = 2
             DWMNCRP_DISABLED = 1
             value = ctypes.c_int(DWMNCRP_DISABLED)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            dwmapi.DwmSetWindowAttribute(
                 wintypes.HWND(hwnd),
                 ctypes.c_uint(DWMWA_NCRENDERING_POLICY),
                 ctypes.byref(value),
                 ctypes.sizeof(value),
             )
+
+            # 2) Win11：强制矩形窗口（关闭系统默认的 8px 圆角）
+            # 否则 mini 模式下深色条会被 DWM 裁成圆角胶囊，圆角外的
+            # 透明像素被 layered window 渲染成半透明白边。
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            DWMWCP_DONOTROUND = 1
+            corner = ctypes.c_int(DWMWCP_DONOTROUND)
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                ctypes.c_uint(DWMWA_WINDOW_CORNER_PREFERENCE),
+                ctypes.byref(corner),
+                ctypes.sizeof(corner),
+            )
         except Exception as e:
             import logging
-            logging.getLogger(__name__).warning("禁用 DWM 投影失败: %s", e)
+            logging.getLogger(__name__).warning("禁用 DWM 投影/圆角失败: %s", e)
 
 
 
