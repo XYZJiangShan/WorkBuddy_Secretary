@@ -110,6 +110,7 @@ class FloatingWindow(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.NoDropShadowWindowHint  # 禁用窗口投影，避免 mini 模式下底部光晕
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
@@ -118,6 +119,33 @@ class FloatingWindow(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        # Windows 下首次 show 后，禁用 DWM 窗口阴影/投影
+        # 避免 mini 模式下深色细条底部出现光晕拖尾
+        if not getattr(self, "_dwm_shadow_disabled", False):
+            self._disable_dwm_shadow()
+            self._dwm_shadow_disabled = True
+
+    def _disable_dwm_shadow(self) -> None:
+        """通过 Win32 DWM API 关闭窗口投影（DWMWA_NCRENDERING_POLICY=DWMNCRP_DISABLED）"""
+        try:
+            import sys
+            if sys.platform != "win32":
+                return
+            import ctypes
+            from ctypes import wintypes
+            hwnd = int(self.winId())
+            DWMWA_NCRENDERING_POLICY = 2
+            DWMNCRP_DISABLED = 1
+            value = ctypes.c_int(DWMNCRP_DISABLED)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                ctypes.c_uint(DWMWA_NCRENDERING_POLICY),
+                ctypes.byref(value),
+                ctypes.sizeof(value),
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("禁用 DWM 投影失败: %s", e)
 
 
 
