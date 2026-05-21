@@ -341,23 +341,25 @@ class MiniBar(QWidget):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # 关闭抗锯齿：直角矩形避免边缘出现半透明像素被 setWindowOpacity 渲染成白边
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         w, h = self.width(), self.height()
 
-        # 背景
+        # 背景：不透明实心矩形（无圆角），撑满整条迷你区域
+        # 注意：必须用不透明颜色（alpha=255），否则透明区会被 windowOpacity 渲染成白边
         if self._is_dark:
-            bg = QColor(30, 27, 50, 220)
+            bg = QColor(30, 27, 50)
         else:
-            bg = QColor(240, 238, 248, 220)
+            bg = QColor(240, 238, 248)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(bg))
-        p.drawRoundedRect(0, 0, w, h, h // 2, h // 2)
+        p.drawRect(0, 0, w, h)
 
-        # 底部品牌色指示线（2px）
+        # 底部品牌色指示线（2px）—— 直角矩形
         accent = QLinearGradient(0, 0, w, 0)
         accent.setColorAt(0, QColor("#8B85FF"))
         accent.setColorAt(1, QColor("#6C63FF"))
         p.setBrush(QBrush(accent))
-        p.drawRoundedRect(0, h - 2, w, 2, 1, 1)
+        p.drawRect(0, h - 2, w, 2)
 
         p.end()

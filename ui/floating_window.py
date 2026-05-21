@@ -558,6 +558,7 @@ class FloatingWindow(QWidget):
         self._card.hide()
         self._mini_bar.setGeometry(0, 0, self.width(), MINI_H)
         self._mini_bar.show()
+        self.update()  # 触发 paintEvent，画 mini 模式不透明背景
 
     def _on_mini_exited(self) -> None:
         """退出迷你模式：恢复最小高度，显示卡片，隐藏迷你条"""
@@ -565,6 +566,7 @@ class FloatingWindow(QWidget):
         self.setMinimumSize(QSize(240, 280))
         self._mini_bar.hide()
         self._card.show()
+        self.update()  # 触发 paintEvent，恢复透明背景
 
     def enterEvent(self, event) -> None:
         self._snap.on_mouse_enter()
@@ -695,7 +697,17 @@ class FloatingWindow(QWidget):
     # ------------------------------------------------------------------ #
 
     def paintEvent(self, event: QPaintEvent) -> None:
-        pass  # 透明背景，无需绘制阴影外圈
+        # 默认透明背景；但 mini 模式下必须画一个不透明背景，
+        # 否则 setWindowOpacity 会把透明区域渲染成半透明白边。
+        if hasattr(self, "_snap") and self._snap.is_mini:
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            # 与 MiniBar 背景一致（深色/浅色）
+            from ui.theme import theme_manager
+            is_dark = theme_manager.current.name == "dark"
+            bg = QColor(30, 27, 50) if is_dark else QColor(240, 238, 248)
+            p.fillRect(self.rect(), bg)
+            p.end()
 
 
 # --------------------------------------------------------------------------- #
