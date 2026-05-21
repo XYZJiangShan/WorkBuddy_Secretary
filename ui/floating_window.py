@@ -558,6 +558,9 @@ class FloatingWindow(QWidget):
         self._card.hide()
         self._mini_bar.setGeometry(0, 0, self.width(), MINI_H)
         self._mini_bar.show()
+        # mini 模式下临时取消透明度，避免 layered window 在深色条周围产生
+        # 半透明白色光晕（windowOpacity<1 时整窗会触发 DWM 半透明渲染）
+        self.setWindowOpacity(1.0)
         self.update()  # 触发 paintEvent，画 mini 模式不透明背景
 
     def _on_mini_exited(self) -> None:
@@ -566,6 +569,9 @@ class FloatingWindow(QWidget):
         self.setMinimumSize(QSize(240, 280))
         self._mini_bar.hide()
         self._card.show()
+        # 恢复用户设置的透明度
+        opacity = self._settings.get_float("window_opacity", 0.92)
+        self.setWindowOpacity(max(0.05, min(1.0, opacity)))
         self.update()  # 触发 paintEvent，恢复透明背景
 
     def enterEvent(self, event) -> None:
