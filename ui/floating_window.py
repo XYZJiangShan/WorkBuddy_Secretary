@@ -237,6 +237,7 @@ class FloatingWindow(QWidget):
         icon_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         icon_label.setStyleSheet("color: #8B85FF;")
         icon_label.setFixedWidth(20)
+        self._icon_label = icon_label  # 保存引用，以便 _apply_theme 更新颜色
 
         self._title_label = QLabel("DeskSec")
         self._title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
@@ -306,8 +307,25 @@ class FloatingWindow(QWidget):
         theme_name = self._settings.get("theme", "light")
         theme_manager.set_theme(theme_name)
         # 同步 mini 配色方案
-        from ui.edge_snap import DEFAULT_PALETTE
-        self._mini_bar.apply_palette(self._settings.get("mini_palette", DEFAULT_PALETTE))
+        from ui.edge_snap import DEFAULT_PALETTE, MINI_PALETTES
+        palette_id = self._settings.get("mini_palette", DEFAULT_PALETTE)
+        self._mini_bar.apply_palette(palette_id)
+        # 同步配色到标题栏 + 进度条
+        palette_set = MINI_PALETTES.get(palette_id, MINI_PALETTES[DEFAULT_PALETTE])
+        is_dark = theme_manager.current.name == "dark"
+        accent_rgb = palette_set["dark" if is_dark else "light"]["accent"]
+        iris_rgb = palette_set["dark" if is_dark else "light"]["iris"]
+        accent_hex = "#{:02x}{:02x}{:02x}".format(*accent_rgb)
+        self._title_label.setStyleSheet(f"color: {accent_hex}; background: transparent; letter-spacing: 1px;")
+        if hasattr(self, "_icon_label"):
+            self._icon_label.setStyleSheet(f"color: {accent_hex};")
+        self._progress_bar._bar.set_accent_colors(
+            accent_hex,
+            "#{:02x}{:02x}{:02x}".format(*iris_rgb),
+        )
+        # 强制整窗口重绘（兜底背景也跟 palette 走）
+        if hasattr(self, "_snap") and self._snap.is_mini:
+            self.repaint()
         # 同步 AI 模式到任务列表
         ai_enabled = self._settings.get_bool("ai_enabled", True)
         self._task_list.set_ai_mode(ai_enabled)
@@ -335,6 +353,14 @@ class FloatingWindow(QWidget):
 
     def _apply_theme(self, theme: Theme) -> None:
 
+        # 从当前配色方案取 accent 色，让标题栏跟着配色走
+        from ui.edge_snap import MINI_PALETTES, DEFAULT_PALETTE
+        pid = self._settings.get("mini_palette", DEFAULT_PALETTE)
+        palette_set = MINI_PALETTES.get(pid, MINI_PALETTES[DEFAULT_PALETTE])
+        is_dark = theme.name == "dark"
+        accent_rgb = palette_set["dark" if is_dark else "light"]["accent"]
+        accent_hex = "#{:02x}{:02x}{:02x}".format(*accent_rgb)
+
         # ---- 主卡片 ----
         self._card.setStyleSheet(f"""
             #Card {{
@@ -344,16 +370,26 @@ class FloatingWindow(QWidget):
             }}
         """)
 
-        # ---- 标题栏文字（品牌色固定）----
-        self._title_label.setStyleSheet("color: #8B85FF; background: transparent; letter-spacing: 1px;")
+        # ---- 标题栏文字（使用配色方案的 accent 色）----
+        self._title_label.setStyleSheet(f"color: {accent_hex}; background: transparent; letter-spacing: 1px;")
+        self._icon_label.setStyleSheet(f"color: {accent_hex};")
 
         # ---- 标题栏按钮（统一颜色）----
         for btn in self._icon_btns:
             btn.apply_theme(theme)
+            # 非 close 按钮的 hover 颜色也跟着配色方案走
+            if btn._icon_key != "close":
+                btn._hover_fg = QColor(accent_hex)
+                btn._hover_bg = QColor(accent_rgb[0], accent_rgb[1], accent_rgb[2], 30)
         self._close_btn.apply_theme(theme)
 
         # ---- 进度条 ----
         self._progress_bar.apply_theme(theme)
+        iris_rgb = palette_set["dark" if is_dark else "light"]["iris"]
+        self._progress_bar._bar.set_accent_colors(
+            accent_hex,
+            "#{:02x}{:02x}{:02x}".format(*iris_rgb),
+        )
 
         # ---- 任务列表 ----
         self._task_list.apply_theme(theme)
@@ -1016,6 +1052,8 @@ class _ProgressBarInner(QWidget):
         self._ratio = 1.0
         self._track_color = QColor("#DCD8F0")
         self._flash = False
+        self._accent1 = QColor("#8B85FF")  # 默认紫色，会被 apply_palette 覆盖
+        self._accent2 = QColor("#6C63FF")
 
     def set_ratio(self, ratio: float) -> None:
         self._ratio = max(0.0, min(1.0, ratio))
@@ -1023,6 +1061,11 @@ class _ProgressBarInner(QWidget):
 
     def set_track_color(self, color: str) -> None:
         self._track_color = QColor(color)
+        self.update()
+
+    def set_accent_colors(self, c1: str, c2: str) -> None:
+        self._accent1 = QColor(c1)
+        self._accent2 = QColor(c2)
         self.update()
 
     def set_flash(self, on: bool) -> None:
@@ -1044,8 +1087,8 @@ class _ProgressBarInner(QWidget):
                 grad.setColorAt(1, QColor("#FF8E53"))
             else:
                 grad = QLinearGradient(0, 0, filled_w, 0)
-                grad.setColorAt(0, QColor("#8B85FF"))
-                grad.setColorAt(1, QColor("#6C63FF"))
+                grad.setColorAt(0, self._accent1)
+                grad.setColorAt(1, self._accent2)
             p.setBrush(QBrush(grad))
             p.drawRoundedRect(0, 0, filled_w, h, h // 2, h // 2)
         p.end()

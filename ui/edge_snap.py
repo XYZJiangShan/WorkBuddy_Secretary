@@ -563,7 +563,7 @@ class MiniBar(QWidget):
         """切换配色方案。palette_id 必须是 MINI_PALETTES 的 key。"""
         if palette_id in MINI_PALETTES:
             self._palette_id = palette_id
-            self.update()
+            self.repaint()  # 强制立即重绘（update 只是标记，可能被合并/忽略）
 
     # ------------------------------------------------------------------ #
     #  数据更新（保留接口兼容，但不再显示内容）
@@ -594,6 +594,7 @@ class MiniBar(QWidget):
         # 配色从 MINI_PALETTES 取，按当前 palette_id + dark/light 选择
         palette_set = MINI_PALETTES.get(self._palette_id, MINI_PALETTES[DEFAULT_PALETTE])
         colors = palette_set["dark"] if self._is_dark else palette_set["light"]
+
 
         bg_top = QColor(*colors["bg_top"])
         bg_bottom = QColor(*colors["bg_bottom"])
