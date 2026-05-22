@@ -218,6 +218,126 @@ def get_palette_options() -> list[tuple[str, str]]:
     return [(pid, MINI_PALETTES[pid]["label"]) for pid in order if pid in MINI_PALETTES]
 
 
+class MouthExpression(Enum):
+    """嘴巴表情枚举"""
+    SMILE = "smile"           # 微笑（默认）
+    SURPRISE = "surprise"     # 吃惊（O 型小圆嘴）
+    SAD = "sad"               # 不开心（下弯弧线）
+    SHOCKED = "shocked"       # 惊讶（倒 V 型 / 倒三角）
+    NEUTRAL = "neutral"       # 平静（一条直线）
+    WINK = "wink"             # 眨眼嘴（单侧上扬）
+
+
+class MouthState:
+    """嘴巴表情状态机，支持平滑过渡"""
+    TRANSITION_MS = 400  # 表情切换过渡时间
+
+    def __init__(self):
+        self._current = MouthExpression.SMILE
+        self._target = MouthExpression.SMILE
+        self._transition_start: Optional[float] = None
+        self._blend = 1.0  # 1.0 = 完全 target，0.0 = 完全 previous
+
+    @property
+    def current(self) -> MouthExpression:
+        return self._current
+
+    def set(self, expr: MouthExpression) -> None:
+        if expr == self._target:
+            return
+        self._current = self._target
+        self._target = expr
+        self._transition_start = time.monotonic() * 1000
+        self._blend = 0.0
+
+    def tick(self) -> None:
+        if self._transition_start is None:
+            return
+        elapsed = time.monotonic() * 1000 - self._transition_start
+        if elapsed >= self.TRANSITION_MS:
+            self._blend = 1.0
+            self._current = self._target
+            self._transition_start = None
+        else:
+            t = elapsed / self.TRANSITION_MS
+            # ease-out-cubic
+            self._blend = 1 - (1 - t) ** 3
+
+    def get_params(self) -> dict:
+        """返回当前插值后的嘴巴参数"""
+        cur = MOUTH_PARAMS[self._current]
+        tgt = MOUTH_PARAMS[self._target]
+        b = self._blend
+        ib = 1 - b
+        return {
+            "mouth_w_factor": cur["mouth_w_factor"] * ib + tgt["mouth_w_factor"] * b,
+            "mouth_y_offset": cur["mouth_y_offset"] * ib + tgt["mouth_y_offset"] * b,
+            "ctrl_y_offset":  cur["ctrl_y_offset"]  * ib + tgt["ctrl_y_offset"]  * b,
+            "ctrl_x_offset":  cur["ctrl_x_offset"]  * ib + tgt["ctrl_x_offset"]  * b,
+            "line_width":     cur["line_width"]     * ib + tgt["line_width"]     * b,
+            "is_closed":      tgt["is_closed"] if b > 0.5 else cur["is_closed"],
+        }
+
+
+# 每种表情的参数定义
+# mouth_w_factor: 嘴宽 = gap * factor
+# mouth_y_offset: 嘴巴 Y = h/2 + offset
+# ctrl_y_offset:  控制点 Y 偏移（正=向下凸=微笑，负=向上凸=悲伤）
+# ctrl_x_offset:  控制点 X 偏移（0=对称，正=右偏）
+# line_width:     描边粗细
+# is_closed:      是否闭合（O 型嘴需要填充）
+MOUTH_PARAMS: dict[MouthExpression, dict] = {
+    MouthExpression.SMILE: {
+        "mouth_w_factor": 0.22,
+        "mouth_y_offset": 2.5,
+        "ctrl_y_offset":  3.0,
+        "ctrl_x_offset":  0.0,
+        "line_width":     2.0,
+        "is_closed":      False,
+    },
+    MouthExpression.SURPRISE: {
+        "mouth_w_factor": 0.08,   # 小圆嘴
+        "mouth_y_offset": 3.0,
+        "ctrl_y_offset":  2.5,    # 向下凸形成小圆
+        "ctrl_x_offset":  0.0,
+        "line_width":     1.8,
+        "is_closed":      True,   # 闭合形成 O
+    },
+    MouthExpression.SAD: {
+        "mouth_w_factor": 0.20,
+        "mouth_y_offset": 3.5,
+        "ctrl_y_offset":  -2.5,   # 负值 = 向上凸 = 嘴角下垂
+        "ctrl_x_offset":  0.0,
+        "line_width":     2.0,
+        "is_closed":      False,
+    },
+    MouthExpression.SHOCKED: {
+        "mouth_w_factor": 0.18,
+        "mouth_y_offset": 2.0,
+        "ctrl_y_offset":  -3.5,   # 倒 V 型
+        "ctrl_x_offset":  0.0,
+        "line_width":     2.2,
+        "is_closed":      False,
+    },
+    MouthExpression.NEUTRAL: {
+        "mouth_w_factor": 0.18,
+        "mouth_y_offset": 3.0,
+        "ctrl_y_offset":  0.0,    # 直线
+        "ctrl_x_offset":  0.0,
+        "line_width":     1.8,
+        "is_closed":      False,
+    },
+    MouthExpression.WINK: {
+        "mouth_w_factor": 0.22,
+        "mouth_y_offset": 2.5,
+        "ctrl_y_offset":  3.5,
+        "ctrl_x_offset":  0.15,   # 控制点偏右 → 右侧上扬更明显
+        "line_width":     2.0,
+        "is_closed":      False,
+    },
+}
+
+
 class SnapEdge(Enum):
     NONE = "none"
     LEFT = "left"
@@ -500,6 +620,14 @@ class MiniBar(QWidget):
         self._next_blink_at = time.monotonic() * 1000 + BLINK_INTERVAL_MS
         self._blink_start_at: Optional[float] = None  # 当前正在眨眼则为开始时刻 ms
 
+        # 嘴巴表情状态机
+        self._mouth = MouthState()
+        self._mouth_auto_timer = QTimer(self)
+        self._mouth_auto_timer.setInterval(5000)  # 每 5s 自动轮播表情
+        self._mouth_auto_timer.timeout.connect(self._auto_cycle_mouth)
+        self._mouth_auto_timer.start()
+        self._mouth_cycle_idx = 0
+
         # 鼠标位置追踪（瞳孔跟随）
         self.setMouseTracking(True)
         self._mouse_pos = QPoint(-9999, -9999)  # 全局坐标系
@@ -536,7 +664,33 @@ class MiniBar(QWidget):
         # 取鼠标全局位置用于瞳孔跟随
         self._mouse_pos = QCursor.pos()
 
+        # 推进嘴巴表情过渡
+        self._mouth.tick()
+
         self.update()
+
+    def _auto_cycle_mouth(self) -> None:
+        """自动轮播嘴巴表情（5s 切换一次）"""
+        expressions = [
+            MouthExpression.SMILE,
+            MouthExpression.NEUTRAL,
+            MouthExpression.SURPRISE,
+            MouthExpression.SAD,
+            MouthExpression.SHOCKED,
+            MouthExpression.WINK,
+        ]
+        self._mouth_cycle_idx = (self._mouth_cycle_idx + 1) % len(expressions)
+        self._mouth.set(expressions[self._mouth_cycle_idx])
+
+    def set_mouth_expression(self, expr: MouthExpression) -> None:
+        """手动设置嘴巴表情（会停止自动轮播）"""
+        self._mouth_auto_timer.stop()
+        self._mouth.set(expr)
+
+    def start_mouth_auto_cycle(self) -> None:
+        """重新启动嘴巴表情自动轮播"""
+        if not self._mouth_auto_timer.isActive():
+            self._mouth_auto_timer.start()
 
     # ------------------------------------------------------------------ #
     #  圆角 mask（每次大小变化时同步）
@@ -721,41 +875,48 @@ class MiniBar(QWidget):
 
     def _draw_mouth(self, p: QPainter, w: int, h: int,
                     left_cx: float, right_cx: float, color: QColor) -> None:
-        """在两眼正中画一道二次贝塞尔微笑弧线。
+        """在两眼正中画嘴巴，支持多种表情（微笑/吃惊/悲伤/惊讶/平静/眨眼）。
 
-        眨眼时嘴角会轻微上扬一点点（联动表情），强度 0.0-1.0。
+        通过 MouthState 插值实现表情之间的平滑过渡。
         """
-        # 嘴宽：两眼内缘之间距离的 22%（中等宽度，不会撞到眼睛也不会太小）
-        # 加上下限保护：最小 14px、最大 32px
+        params = self._mouth.get_params()
         gap = right_cx - left_cx
-        mouth_w = gap * 0.22
-        mouth_w = max(14.0, min(mouth_w, 32.0))
+
+        # 嘴宽
+        mouth_w = gap * params["mouth_w_factor"]
+        mouth_w = max(6.0, min(mouth_w, 36.0))
 
         # 嘴巴中心 X：两眼正中
         center_x = (left_cx + right_cx) / 2.0
 
-        # 嘴巴垂直位置：略低于条中线（更自然的"微笑脸"比例）
-        # 18px 高度下，中线 9，嘴巴端点放在 11-12 之间
-        mouth_y = h / 2.0 + 2.5
+        # 嘴巴垂直位置
+        mouth_y = h / 2.0 + params["mouth_y_offset"]
 
-        # 眨眼时嘴角上扬幅度（眨眼瞬间更"灿烂"）
+        # 眨眼时嘴角上扬幅度（联动）
         smile_boost = 1.0 + self._blink_phase * 0.5
 
-        # 弧线起点/终点 + 控制点（QuadTo 二次贝塞尔）
+        # 弧线起点/终点
         x1 = center_x - mouth_w / 2.0
         x2 = center_x + mouth_w / 2.0
-        # 控制点 Y 高于起终点 → 弧线向下凸 → 视觉上是"嘴角上翘的微笑"
-        # 注意 Qt 坐标系 Y 向下增长，所以"向下凸"的曲线就是微笑
-        ctrl_y = mouth_y + 3.0 * smile_boost
+
+        # 控制点（支持 X 偏移用于 wink 等不对称表情）
+        ctrl_x = center_x + gap * params["ctrl_x_offset"]
+        ctrl_y = mouth_y + params["ctrl_y_offset"] * smile_boost
 
         path = QPainterPath()
         path.moveTo(x1, mouth_y)
-        path.quadTo(center_x, ctrl_y, x2, mouth_y)
+        path.quadTo(ctrl_x, ctrl_y, x2, mouth_y)
 
         pen = QPen(color)
-        pen.setWidthF(2.0)
+        pen.setWidthF(params["line_width"])
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawPath(path)
+
+        if params["is_closed"]:
+            # O 型嘴：闭合填充
+            p.setBrush(QBrush(color))
+            p.drawPath(path)
+        else:
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawPath(path)
