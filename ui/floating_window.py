@@ -97,6 +97,9 @@ class FloatingWindow(QWidget):
         self._mini_bar.setGeometry(0, 0, self.width(), MINI_H)
         self._mini_bar.hide()
         self._mini_bar.apply_theme(theme_manager.current)
+        # 应用初始配色方案
+        from ui.edge_snap import DEFAULT_PALETTE
+        self._mini_bar.apply_palette(self._settings.get("mini_palette", DEFAULT_PALETTE))
 
         # 开启鼠标追踪，支持边缘检测光标变化
         self.setMouseTracking(True)
@@ -302,6 +305,9 @@ class FloatingWindow(QWidget):
         self._apply_opacity()
         theme_name = self._settings.get("theme", "light")
         theme_manager.set_theme(theme_name)
+        # 同步 mini 配色方案
+        from ui.edge_snap import DEFAULT_PALETTE
+        self._mini_bar.apply_palette(self._settings.get("mini_palette", DEFAULT_PALETTE))
         # 同步 AI 模式到任务列表
         ai_enabled = self._settings.get_bool("ai_enabled", True)
         self._task_list.set_ai_mode(ai_enabled)
@@ -772,8 +778,13 @@ class FloatingWindow(QWidget):
             p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             # 与 MiniBar 背景一致（深色/浅色，圆角矩形）
             from ui.theme import theme_manager
+            from ui.edge_snap import MINI_PALETTES, DEFAULT_PALETTE
             is_dark = theme_manager.current.name == "dark"
-            bg = QColor(22, 19, 42) if is_dark else QColor(228, 224, 245)
+            # 从配色表取兜底背景色（与 MiniBar 渐变底端同色）
+            pid = self._settings.get("mini_palette", DEFAULT_PALETTE)
+            colors = MINI_PALETTES.get(pid, MINI_PALETTES[DEFAULT_PALETTE])
+            rgb = colors["dark" if is_dark else "light"]["bg_bottom"]
+            bg = QColor(*rgb)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(bg))
             p.drawRoundedRect(QRectF(0, 0, self.width(), self.height()),

@@ -229,6 +229,17 @@ class SettingsDialog(QDialog):
         self._dark_mode_check.setCursor(Qt.CursorShape.PointingHandCursor)
         content_layout.addWidget(self._dark_mode_check)
 
+        # ---- 迷你条配色风格 ----
+        from ui.edge_snap import get_palette_options
+        self._mini_palette_combo = QComboBox()
+        for pid, label in get_palette_options():
+            self._mini_palette_combo.addItem(label, pid)
+        self._mini_palette_combo.setMaxVisibleItems(8)
+        self._mini_palette_combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._mini_palette_combo.setStyleSheet(self._model_combo.styleSheet())
+        self._mini_palette_combo.setFont(QFont("Microsoft YaHei", 10))
+        content_layout.addWidget(self._field_row("迷你条配色", self._mini_palette_combo))
+
         self._opacity_slider, self._opacity_value_label = self._make_slider(
             0, 100, 92, "%", scale=0.01, fmt="{:.0f}%"
         )
@@ -563,6 +574,15 @@ class SettingsDialog(QDialog):
         self._enabled_check.setChecked(self._settings.get_bool("reminder_enabled", True))
         self._interval_slider.setValue(self._settings.get_int("reminder_interval_minutes", 45))
         self._dark_mode_check.setChecked(self._settings.get("theme", "light") == "dark")
+
+        # 迷你条配色：从 settings 读取，找到对应下拉项
+        from ui.edge_snap import DEFAULT_PALETTE
+        cur_palette = self._settings.get("mini_palette", DEFAULT_PALETTE)
+        for i in range(self._mini_palette_combo.count()):
+            if self._mini_palette_combo.itemData(i) == cur_palette:
+                self._mini_palette_combo.setCurrentIndex(i)
+                break
+
         opacity_pct = int(self._settings.get_float("window_opacity", 0.92) * 100)
         self._opacity_slider.setValue(opacity_pct)
         self._opacity_value_label.setText(f"{opacity_pct}%")
@@ -708,6 +728,7 @@ class SettingsDialog(QDialog):
             "reminder_enabled": "1" if self._enabled_check.isChecked() else "0",
             "reminder_interval_minutes": str(self._interval_slider.value()),
             "theme": "dark" if self._dark_mode_check.isChecked() else "light",
+            "mini_palette": self._mini_palette_combo.currentData() or "aurora",
             "window_opacity": f"{self._opacity_slider.value() / 100:.2f}",
             "hotkey_enabled": "1" if self._hotkey_enabled_check.isChecked() else "0",
             "wxwork_cookie": self._wxwork_cookie_edit.text().strip(),

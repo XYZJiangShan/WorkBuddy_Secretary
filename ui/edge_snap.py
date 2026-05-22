@@ -45,6 +45,179 @@ AUTO_COLLAPSE_DELAY = 100   # 鼠标离开 100ms 后折叠
 POLL_INTERVAL = 80       # 鼠标位置轮询间隔
 
 
+# --------------------------------------------------------------------------- #
+#  迷你条配色方案（5 套，可在设置里切换）
+# --------------------------------------------------------------------------- #
+#
+# 每套包含两个主题（dark / light），字段含义：
+#   bg_top / bg_bottom   背景纵向渐变
+#   accent               强调色（嘴巴、提醒进度条）
+#   sclera               眼白
+#   iris                 虹膜
+#   pupil                瞳孔（深色，用于眼睛中心点）
+#   highlight            顶部 1px 高光线
+#   eyelid               闭眼时的覆盖色（与背景接近）
+#
+# 设计原则：bg_top/bg_bottom alpha 都是 255（不透明），避免 layered window 白边
+#
+
+MINI_PALETTES: dict[str, dict] = {
+    # E - 极光蓝紫（默认推荐）：冷静专业，长时间不疲劳
+    "aurora": {
+        "label": "🫐 极光蓝紫",
+        "dark": {
+            "bg_top":    (26, 31, 54),    # 深蓝 #1A1F36
+            "bg_bottom": (14, 20, 38),    # 更深 #0E1426
+            "accent":    (125, 211, 252), # 天青 #7DD3FC
+            "sclera":    (240, 248, 255),
+            "iris":      (96, 165, 250),  # 蓝紫 #60A5FA
+            "pupil":     (15, 23, 42),
+            "highlight": (45, 60, 100),
+            "eyelid":    (20, 26, 45),
+        },
+        "light": {
+            "bg_top":    (240, 245, 255),
+            "bg_bottom": (215, 226, 245),
+            "accent":    (37, 99, 235),
+            "sclera":    (255, 255, 255),
+            "iris":      (59, 130, 246),
+            "pupil":     (30, 41, 59),
+            "highlight": (190, 210, 240),
+            "eyelid":    (225, 232, 248),
+        },
+    },
+    # A - 深海蓝绿：科技感、深邃
+    "ocean": {
+        "label": "🌊 深海蓝绿",
+        "dark": {
+            "bg_top":    (15, 32, 39),    # #0F2027
+            "bg_bottom": (32, 58, 67),    # #203A43
+            "accent":    (127, 232, 213), # 薄荷绿 #7FE8D5
+            "sclera":    (235, 250, 248),
+            "iris":      (78, 205, 196),  # #4ECDC4
+            "pupil":     (10, 22, 28),
+            "highlight": (40, 75, 85),
+            "eyelid":    (20, 40, 47),
+        },
+        "light": {
+            "bg_top":    (230, 248, 245),
+            "bg_bottom": (200, 232, 226),
+            "accent":    (15, 118, 110),
+            "sclera":    (255, 255, 255),
+            "iris":      (20, 184, 166),
+            "pupil":     (15, 42, 38),
+            "highlight": (180, 220, 215),
+            "eyelid":    (210, 235, 230),
+        },
+    },
+    # B - 暮光暖橙：温暖放松，晚间友好
+    "twilight": {
+        "label": "🌅 暮光暖橙",
+        "dark": {
+            "bg_top":    (45, 27, 46),    # 暗紫红 #2D1B2E
+            "bg_bottom": (26, 15, 31),    # #1A0F1F
+            "accent":    (255, 176, 136), # 蜜桃 #FFB088
+            "sclera":    (255, 245, 235),
+            "iris":      (245, 158, 110), # 暖橙
+            "pupil":     (35, 18, 22),
+            "highlight": (75, 45, 65),
+            "eyelid":    (32, 22, 35),
+        },
+        "light": {
+            "bg_top":    (255, 244, 235),
+            "bg_bottom": (250, 220, 200),
+            "accent":    (217, 119, 87),
+            "sclera":    (255, 255, 255),
+            "iris":      (234, 140, 100),
+            "pupil":     (74, 38, 30),
+            "highlight": (235, 215, 195),
+            "eyelid":    (245, 225, 210),
+        },
+    },
+    # C - 森林墨绿：自然克制，不抢眼
+    "forest": {
+        "label": "🌲 森林墨绿",
+        "dark": {
+            "bg_top":    (31, 45, 42),    # #1F2D2A
+            "bg_bottom": (14, 26, 23),    # #0E1A17
+            "accent":    (168, 213, 186), # 鼠尾草绿 #A8D5BA
+            "sclera":    (240, 248, 240),
+            "iris":      (134, 188, 156),
+            "pupil":     (12, 22, 18),
+            "highlight": (45, 65, 58),
+            "eyelid":    (20, 32, 28),
+        },
+        "light": {
+            "bg_top":    (235, 245, 235),
+            "bg_bottom": (210, 228, 215),
+            "accent":    (52, 124, 84),
+            "sclera":    (255, 255, 255),
+            "iris":      (90, 160, 110),
+            "pupil":     (20, 50, 32),
+            "highlight": (190, 215, 195),
+            "eyelid":    (215, 232, 220),
+        },
+    },
+    # D - 莫兰迪奶咖：温柔高级感、护眼
+    "morandi": {
+        "label": "🪵 莫兰迪奶咖",
+        "dark": {
+            "bg_top":    (43, 38, 32),    # 暖灰棕 #2B2620
+            "bg_bottom": (26, 22, 18),    # #1A1612
+            "accent":    (232, 220, 196), # 米白 #E8DCC4
+            "sclera":    (252, 247, 235),
+            "iris":      (200, 175, 145),
+            "pupil":     (40, 30, 22),
+            "highlight": (75, 65, 55),
+            "eyelid":    (35, 28, 22),
+        },
+        "light": {
+            "bg_top":    (250, 245, 235),
+            "bg_bottom": (228, 218, 200),
+            "accent":    (138, 110, 78),
+            "sclera":    (255, 255, 255),
+            "iris":      (175, 142, 105),
+            "pupil":     (66, 50, 35),
+            "highlight": (220, 208, 188),
+            "eyelid":    (238, 225, 205),
+        },
+    },
+    # 紫色（保留原配色，作为兼容选项）
+    "purple": {
+        "label": "💜 经典紫（原版）",
+        "dark": {
+            "bg_top":    (42, 36, 70),
+            "bg_bottom": (22, 19, 42),
+            "accent":    (139, 133, 255),
+            "sclera":    (245, 243, 255),
+            "iris":      (108, 99, 230),
+            "pupil":     (20, 17, 40),
+            "highlight": (70, 62, 130),
+            "eyelid":    (28, 24, 52),
+        },
+        "light": {
+            "bg_top":    (248, 246, 255),
+            "bg_bottom": (228, 224, 245),
+            "accent":    (108, 99, 255),
+            "sclera":    (255, 255, 255),
+            "iris":      (108, 99, 255),
+            "pupil":     (40, 35, 80),
+            "highlight": (200, 195, 240),
+            "eyelid":    (238, 234, 250),
+        },
+    },
+}
+
+DEFAULT_PALETTE = "aurora"
+
+
+def get_palette_options() -> list[tuple[str, str]]:
+    """返回 [(palette_id, label), ...] 用于设置弹窗下拉填充"""
+    # 推荐顺序：极光 → 深海 → 森林 → 暮光 → 莫兰迪 → 经典紫
+    order = ["aurora", "ocean", "forest", "twilight", "morandi", "purple"]
+    return [(pid, MINI_PALETTES[pid]["label"]) for pid in order if pid in MINI_PALETTES]
+
+
 class SnapEdge(Enum):
     NONE = "none"
     LEFT = "left"
@@ -319,6 +492,7 @@ class MiniBar(QWidget):
         super().__init__(parent)
         self.setFixedHeight(MINI_H)
         self._is_dark = False
+        self._palette_id = DEFAULT_PALETTE      # 当前配色方案 id
         self._reminder_ratio = 1.0
 
         # 眨眼动画状态
@@ -385,6 +559,12 @@ class MiniBar(QWidget):
         self._is_dark = theme.name == "dark"
         self.update()  # 重绘背景
 
+    def apply_palette(self, palette_id: str) -> None:
+        """切换配色方案。palette_id 必须是 MINI_PALETTES 的 key。"""
+        if palette_id in MINI_PALETTES:
+            self._palette_id = palette_id
+            self.update()
+
     # ------------------------------------------------------------------ #
     #  数据更新（保留接口兼容，但不再显示内容）
     # ------------------------------------------------------------------ #
@@ -411,25 +591,22 @@ class MiniBar(QWidget):
 
         # ---- 1) 圆角背景：纵向渐变（顶亮底暗，营造质感）----
         # 因为外层有 setMask 圆角裁剪，这里直接画 roundedRect 双重保险
+        # 配色从 MINI_PALETTES 取，按当前 palette_id + dark/light 选择
+        palette_set = MINI_PALETTES.get(self._palette_id, MINI_PALETTES[DEFAULT_PALETTE])
+        colors = palette_set["dark"] if self._is_dark else palette_set["light"]
+
+        bg_top = QColor(*colors["bg_top"])
+        bg_bottom = QColor(*colors["bg_bottom"])
+        accent = QColor(*colors["accent"])
+        sclera = QColor(*colors["sclera"])
+        iris = QColor(*colors["iris"])
+        pupil = QColor(*colors["pupil"])
+        highlight = QColor(*colors["highlight"])
+        eyelid = QColor(*colors["eyelid"])
+
         bg_grad = QLinearGradient(0, 0, 0, h)
-        if self._is_dark:
-            bg_grad.setColorAt(0.0, QColor(42, 36, 70))      # 顶部稍亮
-            bg_grad.setColorAt(1.0, QColor(22, 19, 42))      # 底部深沉
-            accent = QColor(139, 133, 255)                    # 品牌紫 #8B85FF
-            sclera = QColor(245, 243, 255)                    # 眼白
-            iris = QColor(108, 99, 230)                       # 虹膜
-            pupil = QColor(20, 17, 40)                        # 瞳孔
-            highlight = QColor(70, 62, 130)                   # 顶部高光线
-            eyelid = QColor(28, 24, 52)                       # 眨眼覆盖色（与背景接近）
-        else:
-            bg_grad.setColorAt(0.0, QColor(248, 246, 255))
-            bg_grad.setColorAt(1.0, QColor(228, 224, 245))
-            accent = QColor(108, 99, 255)
-            sclera = QColor(255, 255, 255)
-            iris = QColor(108, 99, 255)
-            pupil = QColor(40, 35, 80)
-            highlight = QColor(200, 195, 240)
-            eyelid = QColor(238, 234, 250)
+        bg_grad.setColorAt(0.0, bg_top)
+        bg_grad.setColorAt(1.0, bg_bottom)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(bg_grad))
         p.drawRoundedRect(QRectF(0, 0, w, h), float(MINI_RADIUS), float(MINI_RADIUS))
