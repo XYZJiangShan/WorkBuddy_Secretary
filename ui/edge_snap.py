@@ -453,7 +453,8 @@ class MiniBar(QWidget):
         # ---- 4) 嘴巴：两眼之间的微笑弧线 ----
         # 仅在不显示"提醒进度条"时绘制（进度条会占用中央区域）
         if self._reminder_ratio >= 0.3:
-            self._draw_mouth(p, w, h, left_cx, right_cx, pupil)
+            # 使用 accent（亮紫）而非 pupil（暗黑）：在深色背景上对比度更高
+            self._draw_mouth(p, w, h, left_cx, right_cx, accent)
 
         # ---- 5) 中心提醒进度（仅当倒计时 < 30% 时显示）----
         if self._reminder_ratio < 0.3:
@@ -546,30 +547,35 @@ class MiniBar(QWidget):
 
         眨眼时嘴角会轻微上扬一点点（联动表情），强度 0.0-1.0。
         """
-        # 嘴宽：两眼内缘之间的 35%（不能太宽，会撞到眼睛）
-        center_x = (left_cx + right_cx) / 2.0
-        mouth_w = (right_cx - left_cx) * 0.35
-        mouth_w = max(8.0, min(mouth_w, 18.0))
+        # 嘴宽：两眼内缘之间距离的 22%（中等宽度，不会撞到眼睛也不会太小）
+        # 加上下限保护：最小 14px、最大 32px
+        gap = right_cx - left_cx
+        mouth_w = gap * 0.22
+        mouth_w = max(14.0, min(mouth_w, 32.0))
 
-        # 嘴巴垂直位置：略低于眼睛中线（更自然的"微笑脸"比例）
-        mouth_y = h / 2.0 + 2.0
+        # 嘴巴中心 X：两眼正中
+        center_x = (left_cx + right_cx) / 2.0
+
+        # 嘴巴垂直位置：略低于条中线（更自然的"微笑脸"比例）
+        # 18px 高度下，中线 9，嘴巴端点放在 11-12 之间
+        mouth_y = h / 2.0 + 2.5
 
         # 眨眼时嘴角上扬幅度（眨眼瞬间更"灿烂"）
-        smile_boost = 1.0 + self._blink_phase * 0.6
+        smile_boost = 1.0 + self._blink_phase * 0.5
 
         # 弧线起点/终点 + 控制点（QuadTo 二次贝塞尔）
         x1 = center_x - mouth_w / 2.0
         x2 = center_x + mouth_w / 2.0
         # 控制点 Y 高于起终点 → 弧线向下凸 → 视觉上是"嘴角上翘的微笑"
         # 注意 Qt 坐标系 Y 向下增长，所以"向下凸"的曲线就是微笑
-        ctrl_y = mouth_y + 2.4 * smile_boost
+        ctrl_y = mouth_y + 3.0 * smile_boost
 
         path = QPainterPath()
         path.moveTo(x1, mouth_y)
         path.quadTo(center_x, ctrl_y, x2, mouth_y)
 
         pen = QPen(color)
-        pen.setWidthF(1.5)
+        pen.setWidthF(2.0)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(pen)
