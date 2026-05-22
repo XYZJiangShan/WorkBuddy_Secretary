@@ -18,20 +18,29 @@ import logging
 from enum import Enum
 from typing import Optional
 
+import math
+import time
+
 from PyQt6.QtCore import (
-    QObject, QPoint, QRect, QSize, QTimer, Qt, pyqtSignal,
+    QObject, QPoint, QRect, QRectF, QSize, QTimer, Qt, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QPainter, QLinearGradient, QBrush,
+    QColor, QPainter, QLinearGradient, QBrush, QPainterPath, QRegion, QCursor,
 )
 from PyQt6.QtWidgets import QApplication, QWidget
 
 logger = logging.getLogger(__name__)
 
 SNAP_THRESHOLD = 40      # 距屏幕边缘多少像素触发吸附
-MINI_H = 14              # 迷你条高度（紧凑但可放装饰元素，避免极薄窗口的渲染问题）
+MINI_H = 18              # 迷你条高度（容纳眨眼眼睛动画）
 MINI_W = 220             # 迷你条参考宽度（实际全宽由窗口决定）
+MINI_RADIUS = 6          # 迷你条圆角半径
 HOVER_EXPAND_DELAY = 80  # 悬浮 80ms 后展开
+
+# ---- 眨眼动画参数 ----
+BLINK_INTERVAL_MS = 3500   # 眨眼周期：每 3.5s 触发一次
+BLINK_DURATION_MS = 180    # 单次眨眼持续：180ms（睁→闭→睁）
+ANIM_FRAME_MS = 33         # ~30fps 重绘频率（眨眼+瞳孔跟随）
 AUTO_COLLAPSE_DELAY = 100   # 鼠标离开 100ms 后折叠
 POLL_INTERVAL = 80       # 鼠标位置轮询间隔
 
@@ -312,6 +321,61 @@ class MiniBar(QWidget):
         self._is_dark = False
         self._reminder_ratio = 1.0
 
+        # 眨眼动画状态
+        self._blink_phase = 0.0          # 0.0=睁眼 → 1.0=完全闭眼
+        self._next_blink_at = time.monotonic() * 1000 + BLINK_INTERVAL_MS
+        self._blink_start_at: Optional[float] = None  # 当前正在眨眼则为开始时刻 ms
+
+        # 鼠标位置追踪（瞳孔跟随）
+        self.setMouseTracking(True)
+        self._mouse_pos = QPoint(-9999, -9999)  # 全局坐标系
+
+        # 帧驱动定时器（30fps）
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(ANIM_FRAME_MS)
+        self._anim_timer.timeout.connect(self._tick)
+        self._anim_timer.start()
+
+    # ------------------------------------------------------------------ #
+    #  动画驱动
+    # ------------------------------------------------------------------ #
+
+    def _tick(self) -> None:
+        """每帧推进眨眼动画 + 触发重绘"""
+        now_ms = time.monotonic() * 1000
+
+        # 是否进入眨眼周期
+        if self._blink_start_at is None and now_ms >= self._next_blink_at:
+            self._blink_start_at = now_ms
+
+        # 计算眨眼相位（0=睁→1=闭→0=睁，正弦曲线，更柔和）
+        if self._blink_start_at is not None:
+            elapsed = now_ms - self._blink_start_at
+            if elapsed >= BLINK_DURATION_MS:
+                self._blink_phase = 0.0
+                self._blink_start_at = None
+                self._next_blink_at = now_ms + BLINK_INTERVAL_MS
+            else:
+                # 半正弦：0→π 对应睁→闭→睁
+                self._blink_phase = math.sin(math.pi * (elapsed / BLINK_DURATION_MS))
+
+        # 取鼠标全局位置用于瞳孔跟随
+        self._mouse_pos = QCursor.pos()
+
+        self.update()
+
+    # ------------------------------------------------------------------ #
+    #  圆角 mask（每次大小变化时同步）
+    # ------------------------------------------------------------------ #
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        # 用 QRegion 给自身做圆角裁剪 —— 圆角外的像素不参与合成，避免半透明白边
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, self.width(), self.height()),
+                            float(MINI_RADIUS), float(MINI_RADIUS))
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+
     # ------------------------------------------------------------------ #
     #  主题
     # ------------------------------------------------------------------ #
@@ -341,48 +405,56 @@ class MiniBar(QWidget):
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        # 关闭抗锯齿：直角矩形避免边缘出现半透明像素
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        # 开启抗锯齿：圆角 + 椭圆眼睛需要平滑边缘
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         w, h = self.width(), self.height()
 
-        # ---- 1) 背景：纵向渐变（顶亮底暗，营造质感）----
-        # 关键约束：所有像素必须 alpha=255，禁止贴近窗口边缘画彩色装饰
+        # ---- 1) 圆角背景：纵向渐变（顶亮底暗，营造质感）----
+        # 因为外层有 setMask 圆角裁剪，这里直接画 roundedRect 双重保险
         bg_grad = QLinearGradient(0, 0, 0, h)
         if self._is_dark:
-            bg_grad.setColorAt(0.0, QColor(38, 33, 62))      # 顶部稍亮
+            bg_grad.setColorAt(0.0, QColor(42, 36, 70))      # 顶部稍亮
             bg_grad.setColorAt(1.0, QColor(22, 19, 42))      # 底部深沉
             accent = QColor(139, 133, 255)                    # 品牌紫 #8B85FF
-            # 预混色：品牌色 30% 叠加在背景顶部色上（避免使用 alpha）
-            highlight = QColor(60, 55, 120)                   # 偏紫的亮色
+            sclera = QColor(245, 243, 255)                    # 眼白
+            iris = QColor(108, 99, 230)                       # 虹膜
+            pupil = QColor(20, 17, 40)                        # 瞳孔
+            highlight = QColor(70, 62, 130)                   # 顶部高光线
+            eyelid = QColor(28, 24, 52)                       # 眨眼覆盖色（与背景接近）
         else:
             bg_grad.setColorAt(0.0, QColor(248, 246, 255))
             bg_grad.setColorAt(1.0, QColor(228, 224, 245))
-            accent = QColor(108, 99, 255)                     # 品牌紫 #6C63FF
-            highlight = QColor(200, 195, 240)                 # 偏紫的浅亮色
+            accent = QColor(108, 99, 255)
+            sclera = QColor(255, 255, 255)
+            iris = QColor(108, 99, 255)
+            pupil = QColor(40, 35, 80)
+            highlight = QColor(200, 195, 240)
+            eyelid = QColor(238, 234, 250)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(bg_grad))
-        p.drawRect(0, 0, w, h)
+        p.drawRoundedRect(QRectF(0, 0, w, h), float(MINI_RADIUS), float(MINI_RADIUS))
 
-        # ---- 2) 顶部 1px 高光线（不透明预混色，营造玻璃感）----
-        # 距离左右边缘各 12px，避免贴边外溢
+        # ---- 2) 顶部 1px 高光线（圆角内距左右 14px）----
         p.setBrush(QBrush(highlight))
-        p.drawRect(12, 0, w - 24, 1)
+        p.drawRect(14, 1, w - 28, 1)
 
-        # ---- 3) 左右对称品牌色装饰小块（距边缘 8px，距上下各 4px）----
-        # 永远不贴近任何窗口边缘 —— layered window 渲染安全
-        block_w = 28
-        block_h = h - 8         # 上下各留 4px 边距
-        margin = 8              # 距左右边缘 8px
-        p.setBrush(QBrush(accent))
-        p.drawRect(margin, 4, block_w, block_h)
-        p.drawRect(w - margin - block_w, 4, block_w, block_h)
+        # ---- 3) 左右两只眼睛 ----
+        eye_w = 14.0
+        eye_h = max(6.0, h - 8.0)        # 眼睛高度比条少 8（上下各 4 边距）
+        eye_y = (h - eye_h) / 2.0
+        margin = 12.0                    # 距左右边缘
+        left_cx = margin + eye_w / 2.0
+        right_cx = w - margin - eye_w / 2.0
 
-        # ---- 4) 中心提醒进度（仅当倒计时 < 30% 时显示，作为"即将触发"提示）----
+        for cx in (left_cx, right_cx):
+            self._draw_eye(p, cx, eye_y + eye_h / 2.0, eye_w, eye_h,
+                           sclera, iris, pupil, eyelid)
+
+        # ---- 4) 中心提醒进度（仅当倒计时 < 30% 时显示）----
         if self._reminder_ratio < 0.3:
             center_y = h // 2
-            # 可填充区域：左右两个 block + margin + 8px 间距
-            inner_left = margin + block_w + 8
-            inner_right = w - margin - block_w - 8
+            inner_left = int(margin + eye_w + 8)
+            inner_right = int(w - margin - eye_w - 8)
             inner_w = max(0, inner_right - inner_left)
             fill_w = int(inner_w * (1.0 - self._reminder_ratio / 0.3))
             fill_w = max(0, min(fill_w, inner_w))
@@ -392,3 +464,69 @@ class MiniBar(QWidget):
                 p.drawRect(start_x, center_y - 1, fill_w, 2)
 
         p.end()
+
+    # ------------------------------------------------------------------ #
+    #  绘制单只眼睛（眼白 + 虹膜 + 瞳孔 + 眨眼时的眼睑覆盖）
+    # ------------------------------------------------------------------ #
+
+    def _draw_eye(self, p: QPainter, cx: float, cy: float, w: float, h: float,
+                  sclera: QColor, iris: QColor, pupil: QColor, eyelid: QColor) -> None:
+        """以 (cx, cy) 为中心画一只眼睛，宽 w 高 h（h 在眨眼时被压扁）"""
+        # 眨眼：phase=0 → 完全睁开；phase=1 → 完全闭合（高度趋近 0）
+        open_ratio = 1.0 - self._blink_phase
+        cur_h = max(0.6, h * open_ratio)
+
+        # ---- 眼白（椭圆）----
+        eye_rect = QRectF(cx - w / 2.0, cy - cur_h / 2.0, w, cur_h)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(sclera))
+        p.drawEllipse(eye_rect)
+
+        # 完全闭眼时不画虹膜
+        if open_ratio < 0.15:
+            return
+
+        # ---- 瞳孔目标位置（跟随鼠标）----
+        # 取鼠标全局坐标转换到本 widget 坐标
+        mouse_local = self.mapFromGlobal(self._mouse_pos)
+        dx = mouse_local.x() - cx
+        dy = mouse_local.y() - cy
+        # 限制瞳孔在虹膜半径内移动
+        max_off_x = w * 0.18
+        max_off_y = cur_h * 0.18
+        # 归一化方向
+        dist = max(1e-3, math.hypot(dx, dy))
+        ndx = dx / dist
+        ndy = dy / dist
+        # 距离越近偏移越小（避免鼠标紧贴时抖动）
+        intensity = min(1.0, dist / 200.0)
+        off_x = ndx * max_off_x * intensity
+        off_y = ndy * max_off_y * intensity
+
+        # ---- 虹膜 ----
+        iris_w = w * 0.55
+        iris_h = cur_h * 0.75
+        iris_rect = QRectF(cx + off_x - iris_w / 2.0,
+                           cy + off_y - iris_h / 2.0,
+                           iris_w, iris_h)
+        p.setBrush(QBrush(iris))
+        p.drawEllipse(iris_rect)
+
+        # ---- 瞳孔 ----
+        if open_ratio > 0.4:
+            pupil_w = w * 0.25
+            pupil_h = cur_h * 0.45
+            pupil_rect = QRectF(cx + off_x - pupil_w / 2.0,
+                                cy + off_y - pupil_h / 2.0,
+                                pupil_w, pupil_h)
+            p.setBrush(QBrush(pupil))
+            p.drawEllipse(pupil_rect)
+
+            # 高光小圆点（仅完全睁眼时）
+            if open_ratio > 0.7:
+                hl_d = w * 0.12
+                hl_rect = QRectF(cx + off_x - pupil_w * 0.15,
+                                 cy + off_y - pupil_h * 0.45,
+                                 hl_d, hl_d)
+                p.setBrush(QBrush(QColor(255, 255, 255)))
+                p.drawEllipse(hl_rect)

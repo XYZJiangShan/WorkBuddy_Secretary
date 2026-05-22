@@ -596,7 +596,7 @@ class FloatingWindow(QWidget):
     def _on_mini_entered(self) -> None:
         """进入迷你模式：解除最小高度限制，隐藏卡片，显示迷你条"""
         # 注意：不再自动关闭 detail panel，避免用户正在查看时被强制关闭
-        from ui.edge_snap import MINI_H
+        from ui.edge_snap import MINI_H, MINI_RADIUS
         # 必须先降低 minimumSize，否则 edge_snap 的 resize(w, MINI_H) 会被 Qt 忽略
         self.setMinimumSize(QSize(240, MINI_H))
         self._card.hide()
@@ -605,6 +605,8 @@ class FloatingWindow(QWidget):
         # mini 模式下临时取消透明度，避免 layered window 在深色条周围产生
         # 半透明白色光晕（windowOpacity<1 时整窗会触发 DWM 半透明渲染）
         self.setWindowOpacity(1.0)
+        # 给整窗加圆角 mask（与 MiniBar 同步圆角）
+        self._apply_mini_mask(MINI_RADIUS)
         self.update()  # 触发 paintEvent，画 mini 模式不透明背景
 
     def _on_mini_exited(self) -> None:
@@ -616,7 +618,18 @@ class FloatingWindow(QWidget):
         # 恢复用户设置的透明度
         opacity = self._settings.get_float("window_opacity", 0.92)
         self.setWindowOpacity(max(0.05, min(1.0, opacity)))
+        # 清除圆角 mask（恢复矩形整窗）
+        self.clearMask()
         self.update()  # 触发 paintEvent，恢复透明背景
+
+    def _apply_mini_mask(self, radius: int) -> None:
+        """给整窗设置圆角 mask（仅 mini 模式使用）"""
+        from PyQt6.QtCore import QRectF
+        from PyQt6.QtGui import QPainterPath, QRegion
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, self.width(), self.height()),
+                            float(radius), float(radius))
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
     def enterEvent(self, event) -> None:
         self._snap.on_mouse_enter()
@@ -627,8 +640,11 @@ class FloatingWindow(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if hasattr(self, "_mini_bar"):
-            from ui.edge_snap import MINI_H
+            from ui.edge_snap import MINI_H, MINI_RADIUS
             self._mini_bar.setGeometry(0, 0, self.width(), MINI_H)
+            # 若当前在 mini 模式，重新计算整窗圆角 mask 适配新宽度
+            if hasattr(self, "_snap") and getattr(self._snap, "is_mini", False):
+                self._apply_mini_mask(MINI_RADIUS)
 
     # ------------------------------------------------------------------ #
     #  鼠标拖拽（含边缘吸附）
@@ -750,13 +766,18 @@ class FloatingWindow(QWidget):
         # 默认透明背景；但 mini 模式下必须画一个不透明背景，
         # 否则 setWindowOpacity 会把透明区域渲染成半透明白边。
         if hasattr(self, "_snap") and self._snap.is_mini:
+            from PyQt6.QtCore import QRectF
+            from ui.edge_snap import MINI_RADIUS
             p = QPainter(self)
-            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-            # 与 MiniBar 背景一致（深色/浅色）
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            # 与 MiniBar 背景一致（深色/浅色，圆角矩形）
             from ui.theme import theme_manager
             is_dark = theme_manager.current.name == "dark"
-            bg = QColor(30, 27, 50) if is_dark else QColor(240, 238, 248)
-            p.fillRect(self.rect(), bg)
+            bg = QColor(22, 19, 42) if is_dark else QColor(228, 224, 245)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(bg))
+            p.drawRoundedRect(QRectF(0, 0, self.width(), self.height()),
+                              float(MINI_RADIUS), float(MINI_RADIUS))
             p.end()
 
 
