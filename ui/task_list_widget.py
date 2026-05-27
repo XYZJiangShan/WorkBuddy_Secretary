@@ -38,11 +38,11 @@ class PriorityLed(QWidget):
 
     clicked = pyqtSignal()
 
-    # 颜色方案：(主色, 高光色, 外晕色, 暗边色)
+# 颜色方案：(主色, 高光色, 外晕色, 暗边色, 灯丝色, 玻璃反射色)
     _COLORS = {
-        "high":   (QColor("#FF4444"), QColor("#FF9999"), QColor(255, 60, 60, 50),  QColor("#AA0000")),
-        "medium": (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A")),
-        "low":    (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A")),
+        "high":   (QColor("#FF4444"), QColor("#FF9999"), QColor(255, 60, 60, 50),  QColor("#AA0000"), QColor("#FFDDDD"), QColor(255, 255, 255, 180)),
+        "medium": (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A"), QColor("#DDFFDD"), QColor(255, 255, 255, 180)),
+        "low":    (QColor("#2DD96B"), QColor("#90F0B0"), QColor(50, 220, 100, 50), QColor("#0A8A3A"), QColor("#DDFFDD"), QColor(255, 255, 255, 180)),
     }
 
     def __init__(self, priority: str = "medium", parent=None):
@@ -78,7 +78,7 @@ class PriorityLed(QWidget):
         cx, cy = w / 2, h / 2
         r = 5.0 * (1.12 if self._hovered else 1.0)
 
-        main_c, highlight_c, glow_c, dark_c = self._COLORS.get(
+        main_c, highlight_c, glow_c, dark_c, filament_c, glass_c = self._COLORS.get(
             self._priority, self._COLORS["medium"]
         )
         p.setPen(Qt.PenStyle.NoPen)
@@ -135,6 +135,24 @@ class PriorityLed(QWidget):
         dot.setColorAt(1.0, QColor(255, 255, 255, 0))
         p.setBrush(QBrush(dot))
         p.drawEllipse(QRectF(cx - r * 0.32, cy - r * 0.38, r * 0.35, r * 0.35))
+
+        # ---- 7. 灯丝（模拟迷你灯泡核心）----
+        filament = QRadialGradient(QPointF(cx, cy), r * 0.45)
+        filament.setColorAt(0.0, filament_c)
+        filament.setColorAt(0.6, filament_c)
+        filament_edge = QColor(filament_c)
+        filament_edge.setAlpha(0)
+        filament.setColorAt(1.0, filament_edge)
+        p.setBrush(QBrush(filament))
+        p.drawEllipse(QRectF(cx - r * 0.45, cy - r * 0.45, r * 0.9, r * 0.9))
+
+        # ---- 8. 灯丝中心亮点（模拟钨丝发光核心）----
+        core = QRadialGradient(QPointF(cx, cy), r * 0.22)
+        core.setColorAt(0.0, QColor(255, 255, 255, 240))
+        core.setColorAt(0.5, QColor(255, 255, 255, 120))
+        core.setColorAt(1.0, QColor(255, 255, 255, 0))
+        p.setBrush(QBrush(core))
+        p.drawEllipse(QRectF(cx - r * 0.22, cy - r * 0.22, r * 0.44, r * 0.44))
 
         p.end()
 
