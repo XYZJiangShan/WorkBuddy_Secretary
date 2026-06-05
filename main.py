@@ -65,6 +65,16 @@ def main() -> int:
     app.setApplicationDisplayName("桌面小秘书")
     app.setQuitOnLastWindowClosed(False)
 
+    # ---- 单实例保护（必须在 QApplication 之后、其它初始化之前）----
+    # 防止重复启动堆积多个托盘图标/窗口
+    from services.single_instance import SingleInstance
+    instance_guard = SingleInstance()
+    if instance_guard.is_already_running():
+        # 已有实例在运行 → 通知它显示窗口，自己退出
+        instance_guard.notify_existing()
+        logger.info("检测到已有实例在运行，本次启动退出")
+        return 0
+
     # ---- 主线程预热（必须在任何子线程启动前完成，防止 COM 冲突 0x8001010d）----
     # openai/httpx/ssl 首次初始化必须在主线程，否则子线程 COM 冲突崩溃
     try:
@@ -162,6 +172,10 @@ def main() -> int:
         else:
             show_window()
 
+    # 启动单实例 IPC 服务：后来者唤起时显示窗口
+    instance_guard.start_server()
+    instance_guard.activate_requested.connect(show_window)
+
     def quit_app():
         hotkey_service.stop()
         reminder_service.stop()
@@ -175,6 +189,7 @@ def main() -> int:
                 sync_service.push_now()
             except Exception as e:
                 logger.warning("退出同步失败: %s", e)
+        instance_guard.cleanup()  # 释放单实例锁
         close_db()
         app.quit()
 
