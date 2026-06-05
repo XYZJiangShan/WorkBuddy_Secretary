@@ -33,9 +33,11 @@ logger = logging.getLogger(__name__)
 # 轮询间隔（毫秒）
 POLL_INTERVAL_MS = 2000
 
-# 判定"AI 正在工作"的超时阈值：如果 updated_at 超过此时间没更新，
-# 即使 status='working'，也认为 AI 已停止（可能进程异常退出）
-STALE_THRESHOLD_SEC = 10
+# 判定"AI 正在工作"的超时阈值（秒）：status='working' 是 WorkBuddy 标记 AI 执行
+# 的可靠状态，正常结束会改成 completed。此阈值仅作兜底——防止进程异常崩溃留下
+# 残留的 working 状态导致永久误报。设大一些（60s），避免 AI 思考/长工具调用期间
+# updated_at 短暂不刷新被误判为空闲（闪烁主因之一）。
+STALE_THRESHOLD_SEC = 60
 
 # WorkBuddy 数据库路径
 WORKBUDDY_DB_PATH = os.path.join(
@@ -81,6 +83,17 @@ CODEBUDDY_NOISE_ENDPOINTS = (
 # 未配对 start 超过此时长（秒）仍未 end，视为"陈旧请求"（可能是异常中断），不再算作忙碌
 CODEBUDDY_PENDING_STALE_SEC = 180
 
+# ---- 忙碌状态冷却期（关键：消除闪烁）----
+# AI 一次完整执行（一个 turn）由多个 HTTP 请求串联组成：
+#   发请求→等响应→处理工具调用→再发下一个请求……
+# 两个请求之间存在数百毫秒到数秒的间隙，期间"未配对请求集合"会短暂变空，
+# WorkBuddy 的 updated_at 在 AI 思考停顿时也会短暂不刷新。
+# 若直接据此判定，指示灯会在一次执行内频繁红绿跳变（闪烁）。
+# 解决：一旦检测到忙碌，记录时刻；之后即使瞬时检测为空闲，
+#       只要距上次忙碌不超过冷却期，仍保持"忙碌"。
+# 只有持续空闲超过冷却期，才真正切换为"空闲"。
+BUSY_COOLDOWN_SEC = 12.0
+
 
 class AIStatusMonitor(QObject):
     """
@@ -112,6 +125,11 @@ class AIStatusMonitor(QObject):
         self._cb_log_offset: int = 0
         # 未配对的 HTTP 请求：{trace_id: 首次出现的时间戳(秒)}
         self._cb_pending: dict[str, float] = {}
+
+        # ---- 忙碌冷却：记录每个来源最后一次"原始检测为忙碌"的时刻 ----
+        # 用于消除一次执行内多请求间隙造成的红绿闪烁
+        self._wb_last_busy_ts: float = 0.0
+        self._cb_last_busy_ts: float = 0.0
 
     def start(self) -> None:
         """启动轮询"""
@@ -149,23 +167,46 @@ class AIStatusMonitor(QObject):
         self._check_workbuddy()
         self._check_codebuddy()
 
+    def _apply_cooldown(self, raw_busy: bool, ts_attr: str) -> bool:
+        """
+        忙碌冷却：消除一次 AI 执行内多请求间隙造成的红绿闪烁。
+
+        - raw_busy=True：刷新该来源的"最后忙碌时刻"，返回 True
+        - raw_busy=False：若距最后忙碌时刻未超过 BUSY_COOLDOWN_SEC，
+          仍返回 True（保持红色）；超过冷却期才返回 False（真正空闲）
+
+        ts_attr: 存储该来源最后忙碌时刻的实例属性名
+        """
+        now = time.monotonic()
+        if raw_busy:
+            setattr(self, ts_attr, now)
+            return True
+        last_busy = getattr(self, ts_attr, 0.0)
+        if last_busy > 0 and (now - last_busy) <= BUSY_COOLDOWN_SEC:
+            # 冷却期内：保持忙碌，避免闪烁
+            return True
+        return False
+
     def _check_workbuddy(self) -> None:
-        """检测 WorkBuddy 的 AI 状态"""
+        """检测 WorkBuddy 的 AI 状态（带忙碌冷却，消除闪烁）"""
         if not os.path.isfile(WORKBUDDY_DB_PATH):
             # 数据库不存在 → WorkBuddy 未安装或未运行
-            new_busy = False
+            raw_busy = False
         else:
             try:
-                new_busy = self._query_workbuddy_status()
+                raw_busy = self._query_workbuddy_status()
             except Exception as e:
                 logger.debug("查询 WorkBuddy 状态失败: %s", e)
-                new_busy = False
+                raw_busy = False
+
+        # 应用冷却：原始忙碌→刷新时间戳；原始空闲→冷却期内仍视为忙碌
+        effective_busy = self._apply_cooldown(raw_busy, "_wb_last_busy_ts")
 
         # 状态变化时发射信号
-        if new_busy != self._workbuddy_busy:
-            self._workbuddy_busy = new_busy
-            self.status_changed.emit("workbuddy", new_busy)
-            logger.info("WorkBuddy AI 状态: %s", "执行中" if new_busy else "空闲")
+        if effective_busy != self._workbuddy_busy:
+            self._workbuddy_busy = effective_busy
+            self.status_changed.emit("workbuddy", effective_busy)
+            logger.info("WorkBuddy AI 状态: %s", "执行中" if effective_busy else "空闲")
 
     def _query_workbuddy_status(self) -> bool:
         """查询 WorkBuddy 数据库，判断 AI 是否正在执行"""
@@ -198,20 +239,22 @@ class AIStatusMonitor(QObject):
         return False
 
     def _check_codebuddy(self) -> None:
-        """检测 CodeBuddy CN (VS Code 插件) 的 AI 状态"""
+        """检测 CodeBuddy CN (VS Code 插件) 的 AI 状态（带忙碌冷却，消除闪烁）"""
         if not os.path.isdir(CODEBUDDY_CN_DIR):
-            new_busy = False
+            raw_busy = False
         else:
             try:
-                new_busy = self._query_codebuddy_status()
+                raw_busy = self._query_codebuddy_status()
             except Exception as e:
                 logger.debug("查询 CodeBuddy 状态失败: %s", e)
-                new_busy = False
+                raw_busy = False
 
-        if new_busy != self._codebuddy_busy:
-            self._codebuddy_busy = new_busy
-            self.status_changed.emit("codebuddy", new_busy)
-            logger.info("CodeBuddy AI 状态: %s", "执行中" if new_busy else "空闲")
+        effective_busy = self._apply_cooldown(raw_busy, "_cb_last_busy_ts")
+
+        if effective_busy != self._codebuddy_busy:
+            self._codebuddy_busy = effective_busy
+            self.status_changed.emit("codebuddy", effective_busy)
+            logger.info("CodeBuddy AI 状态: %s", "执行中" if effective_busy else "空闲")
 
     def _query_codebuddy_status(self) -> bool:
         """
