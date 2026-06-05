@@ -49,6 +49,38 @@ CODEBUDDY_CN_DIR = os.path.join(
     "CodeBuddy CN"
 )
 
+# CodeBuddy CN 插件日志的 glob 匹配模式（logs/<时间戳>/<窗口>/exthost/Tencent-Cloud.coding-copilot/*.log）
+CODEBUDDY_LOG_GLOB = os.path.join(
+    CODEBUDDY_CN_DIR, "logs", "*", "*", "exthost",
+    "Tencent-Cloud.coding-copilot", "*.log"
+)
+
+# CodeBuddy CN AI 请求检测：
+#   插件日志会记录每个 HTTP 请求的 start/end，并带 Trace ID。
+#   AI 对话/执行时会发起一个长时间的流式请求（只有 start 迟迟没 end）。
+#   通过追踪"未配对的 start"判断 AI 是否在执行。
+# 需要排除的后台噪音端点（这些是插件自身的轮询/上报，不代表 AI 在工作）
+CODEBUDDY_NOISE_ENDPOINTS = (
+    "/v3/config",
+    "/v2/report",
+    "/v2/market-mcp-server/servers",
+    "/api/memory/profile",
+    "/console/enterprises",
+    "/v2/enterprises",
+    "/v2/activity/banner",
+    "/v2/billing",
+    "/v2/plugin/auth",
+    "/v2/login",
+    "/v2/account",
+    "/v2/quota",
+    "/v2/usage",
+    "telemetry",
+    "/heartbeat",
+)
+
+# 未配对 start 超过此时长（秒）仍未 end，视为"陈旧请求"（可能是异常中断），不再算作忙碌
+CODEBUDDY_PENDING_STALE_SEC = 180
+
 
 class AIStatusMonitor(QObject):
     """
@@ -72,6 +104,14 @@ class AIStatusMonitor(QObject):
 
         # WorkBuddy 上次检测到的 updated_at（用于检测是否仍在刷新）
         self._wb_last_updated_at: int = 0
+
+        # ---- CodeBuddy 日志增量监控状态 ----
+        # 当前正在追踪的日志文件路径
+        self._cb_log_path: Optional[str] = None
+        # 上次读取到的文件偏移量（增量读取）
+        self._cb_log_offset: int = 0
+        # 未配对的 HTTP 请求：{trace_id: 首次出现的时间戳(秒)}
+        self._cb_pending: dict[str, float] = {}
 
     def start(self) -> None:
         """启动轮询"""
@@ -175,47 +215,103 @@ class AIStatusMonitor(QObject):
 
     def _query_codebuddy_status(self) -> bool:
         """
-        检测 CodeBuddy CN 的 AI 执行状态
+        检测 CodeBuddy CN 的 AI 执行状态（基于插件日志增量监控）
+
+        原理：
+          CodeBuddy CN 插件日志（Tencent-Cloud.coding-copilot/*.log）会记录
+          每个 HTTP 请求的开始和结束，格式如下：
+            [HTTP STATUS] start POST /xxx | Trace: <id>
+            [HTTP STATUS] end POST /xxx | Status: 200 | Trace: <id> | Request: <rid>
+          当 AI 正在对话/执行（流式生成）时，会有一个长时间"只有 start 没有 end"
+          的请求。通过追踪未配对的 Trace ID 判断 AI 是否在执行。
 
         策略：
-        1. 检查 CodeBuddy CN 进程是否在运行
-        2. 如果在运行，读取 state.vscdb 查找 AI 活动标记
-        3. 由于 CodeBuddy CN 没有像 WorkBuddy 那样明确的 sessions 表，
-           我们使用进程 CPU 使用率作为辅助判断（CPU > 5% 视为活跃）
+          1. 找到最新的插件日志文件
+          2. 增量读取新追加的内容（记录文件偏移量）
+          3. 解析每行的 start/end，维护未配对请求集合 _cb_pending
+          4. 过滤掉后台噪音端点（config/report/mcp 等轮询请求）
+          5. 存在有效未配对请求 → AI 执行中
         """
-        # 方法1：检查进程是否存在
-        import subprocess
+        # 1) 找最新日志文件
+        log_path = self._find_latest_codebuddy_log()
+        if not log_path:
+            # 没有日志 → 插件未运行
+            self._cb_pending.clear()
+            return False
+
+        # 2) 日志文件切换（新会话）→ 重置偏移量和未配对集合
+        if log_path != self._cb_log_path:
+            self._cb_log_path = log_path
+            self._cb_log_offset = 0
+            self._cb_pending.clear()
+
+        # 3) 增量读取新内容
         try:
-            result = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq CodeBuddy CN.exe"],
-                capture_output=True, text=True, encoding="gbk",
-                timeout=3,
-            )
-            if "CodeBuddy CN.exe" not in result.stdout:
-                return False
-        except Exception:
-            pass
+            file_size = os.path.getsize(log_path)
+            # 文件被截断（日志轮转）→ 从头读
+            if file_size < self._cb_log_offset:
+                self._cb_log_offset = 0
+                self._cb_pending.clear()
 
-        # 方法2：检查 CodeBuddy CN 的 workspaceStorage 中是否有活跃会话
-        # CodeBuddy CN 的会话数据存在 state.vscdb 的 ItemTable 中
-        state_db = os.path.join(
-            CODEBUDDY_CN_DIR, "User", "globalStorage", "state.vscdb"
-        )
-        if os.path.isfile(state_db):
-            try:
-                conn = sqlite3.connect(f"file:{state_db}?mode=ro", uri=True)
-                cursor = conn.cursor()
-                # 查找包含 chat/agent 活动标记的键
-                rows = cursor.execute(
-                    "SELECT key FROM ItemTable WHERE key LIKE '%chat%' OR key LIKE '%agent%' OR key LIKE '%working%'"
-                ).fetchall()
-                conn.close()
-                # CodeBuddy CN 的状态检测不如 WorkBuddy 精确，
-                # 暂时仅通过进程存在来判断"在线"，无法精确判断 AI 是否在执行
-                # 后续可以扩展更精确的检测方式
-            except Exception:
-                pass
+            if file_size > self._cb_log_offset:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    f.seek(self._cb_log_offset)
+                    new_lines = f.readlines()
+                    self._cb_log_offset = f.tell()
+                self._parse_codebuddy_lines(new_lines)
+        except Exception as e:
+            logger.debug("读取 CodeBuddy 日志失败: %s", e)
+            return False
 
-        # 简化策略：CodeBuddy CN 进程在运行但无法精确判断 AI 状态时，
-        # 返回 False（保守策略：不误报忙碌）
-        return False
+        # 4) 清理陈旧的未配对请求（超时未结束，可能异常中断）
+        now = time.time()
+        stale = [
+            tid for tid, ts in self._cb_pending.items()
+            if now - ts > CODEBUDDY_PENDING_STALE_SEC
+        ]
+        for tid in stale:
+            self._cb_pending.pop(tid, None)
+
+        # 5) 还有有效未配对请求 = AI 执行中
+        return len(self._cb_pending) > 0
+
+    def _find_latest_codebuddy_log(self) -> Optional[str]:
+        """找到最新修改的 CodeBuddy CN 插件日志文件"""
+        import glob
+        candidates = glob.glob(CODEBUDDY_LOG_GLOB)
+        if not candidates:
+            return None
+        # 只关注最近 5 分钟内有更新的日志（避免追踪已退出会话的旧日志）
+        now = time.time()
+        active = [c for c in candidates if now - os.path.getmtime(c) < 300]
+        pool = active if active else candidates
+        return max(pool, key=os.path.getmtime)
+
+    def _parse_codebuddy_lines(self, lines: list[str]) -> None:
+        """
+        解析日志行，维护未配对的 HTTP 请求集合。
+
+        - 遇到 'start ... Trace: X' → 记录 X（若非噪音端点）
+        - 遇到 'end ... Trace: X'   → 移除 X
+        """
+        now = time.time()
+        for line in lines:
+            if "[HTTP STATUS]" not in line:
+                continue
+
+            # 提取 Trace ID
+            trace_idx = line.find("Trace:")
+            if trace_idx < 0:
+                continue
+            trace_id = line[trace_idx + 6:].split("|")[0].strip()
+            if not trace_id:
+                continue
+
+            if " start " in line:
+                # 噪音端点不计入
+                if any(noise in line for noise in CODEBUDDY_NOISE_ENDPOINTS):
+                    continue
+                self._cb_pending[trace_id] = now
+            elif " end " in line:
+                # 请求结束 → 配对移除
+                self._cb_pending.pop(trace_id, None)
