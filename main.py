@@ -26,6 +26,7 @@ from services.reminder_service import ReminderService
 from services.hotkey_service import HotkeyService
 from services.sync_service import SyncService
 from services.auto_report_service import AutoReportService
+from services.ai_status_monitor import AIStatusMonitor
 
 # ---- 日志 ----
 # 日志写到文件 + 控制台，崩溃后可查
@@ -121,6 +122,7 @@ def main() -> int:
     )
     sync_service = SyncService(settings)
     auto_report_service = AutoReportService(ai_service, task_repo, settings)
+    ai_status_monitor = AIStatusMonitor()
 
     # 启动时从 GitHub 拉取（后台，不阻塞 UI）
     def _startup_pull():
@@ -138,6 +140,11 @@ def main() -> int:
         settings, task_repo, ai_service, reminder_service
     )
     tray = TrayIcon()
+
+    # ---- AI 状态监控信号 ----
+    def _on_ai_status_changed(source: str, busy: bool):
+        main_window.set_ai_status(ai_status_monitor.any_busy)
+    ai_status_monitor.status_changed.connect(_on_ai_status_changed)
 
     # ---- 窗口显示/隐藏逻辑 ----
     def show_window():
@@ -160,6 +167,7 @@ def main() -> int:
         reminder_service.stop()
         auto_report_service.stop()
         sync_service.stop()
+        ai_status_monitor.stop()
         # 退出时推送（同步，最多等 10 秒）
         if sync_service.is_enabled():
             logger.info("退出同步：推送数据到 GitHub…")
@@ -204,6 +212,7 @@ def main() -> int:
     main_window.raise_()
     reminder_service.start()
     sync_service.start()   # 启动定时同步
+    ai_status_monitor.start()  # 启动 AI 状态监控
     # 延迟启动自动日报（等 AI 客户端和事件循环都稳定后）
     QTimer.singleShot(5000, auto_report_service.start)
     auto_report_service.daily_report_generated.connect(

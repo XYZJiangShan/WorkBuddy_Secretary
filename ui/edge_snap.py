@@ -632,6 +632,9 @@ class MiniBar(QWidget):
         self.setMouseTracking(True)
         self._mouse_pos = QPoint(-9999, -9999)  # 全局坐标系
 
+        # AI 状态指示灯（绿色=空闲，红色=AI执行中）
+        self._ai_busy: bool = False
+
         # 帧驱动定时器（30fps）
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(ANIM_FRAME_MS)
@@ -691,6 +694,19 @@ class MiniBar(QWidget):
         """重新启动嘴巴表情自动轮播"""
         if not self._mouth_auto_timer.isActive():
             self._mouth_auto_timer.start()
+
+    def set_ai_status(self, busy: bool) -> None:
+        """设置 AI 运行状态（True=执行中/红色，False=空闲/绿色）"""
+        if self._ai_busy != busy:
+            self._ai_busy = busy
+            # AI 忙碌时嘴巴变成惊讶表情，空闲时回到微笑
+            if busy:
+                self._mouth.set(MouthExpression.SURPRISE)
+                self._mouth_auto_timer.stop()
+            else:
+                self._mouth.set(MouthExpression.SMILE)
+                self._mouth_auto_timer.start()
+            self.update()
 
     # ------------------------------------------------------------------ #
     #  圆角 mask（每次大小变化时同步）
@@ -776,11 +792,17 @@ class MiniBar(QWidget):
         eye_y = (h - eye_h) / 2.0
         margin = 12.0                    # 距左右边缘
         left_cx = margin + eye_w / 2.0
-        right_cx = w - margin - eye_w / 2.0
+        right_cx = w - margin - eye_w / 2.0 - 10.0  # 右眼稍左移，给状态灯腾位置
 
         for cx in (left_cx, right_cx):
             self._draw_eye(p, cx, eye_y + eye_h / 2.0, eye_w, eye_h,
                            sclera, iris, pupil, eyelid)
+
+        # ---- 3.5) AI 状态指示灯（右眼右侧的小圆点）----
+        led_x = right_cx + eye_w / 2.0 + 5.0
+        led_y = h / 2.0
+        led_r = 2.5  # 指示灯半径
+        self._draw_status_led(p, led_x, led_y, led_r, accent)
 
         # ---- 4) 嘴巴：两眼之间的微笑弧线 ----
         # 仅在不显示"提醒进度条"时绘制（进度条会占用中央区域）
@@ -802,6 +824,54 @@ class MiniBar(QWidget):
                 p.drawRect(start_x, center_y - 1, fill_w, 2)
 
         p.end()
+
+    # ------------------------------------------------------------------ #
+    #  AI 状态指示灯（小圆点：绿色=空闲，红色=执行中）
+    # ------------------------------------------------------------------ #
+
+    def _draw_status_led(self, p: QPainter, cx: float, cy: float, r: float,
+                         accent: QColor) -> None:
+        """在 (cx, cy) 画一个 AI 状态指示灯，半径 r"""
+        from PyQt6.QtGui import QRadialGradient
+
+        if self._ai_busy:
+            # 红色：AI 执行中
+            core_color = QColor(255, 80, 80)
+            glow_color = QColor(255, 60, 60, 120)
+            outer_color = QColor(255, 40, 40, 30)
+        else:
+            # 绿色：空闲
+            core_color = QColor(80, 220, 120)
+            glow_color = QColor(60, 200, 100, 120)
+            outer_color = QColor(40, 180, 80, 30)
+
+        # 外层光晕
+        glow_r = r * 2.5
+        glow_grad = QRadialGradient(cx, cy, glow_r)
+        glow_grad.setColorAt(0.0, outer_color)
+        glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(glow_grad))
+        p.drawEllipse(QRectF(cx - glow_r, cy - glow_r, glow_r * 2, glow_r * 2))
+
+        # 内层发光
+        inner_r = r * 1.4
+        inner_grad = QRadialGradient(cx, cy, inner_r)
+        inner_grad.setColorAt(0.0, glow_color)
+        inner_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setBrush(QBrush(inner_grad))
+        p.drawEllipse(QRectF(cx - inner_r, cy - inner_r, inner_r * 2, inner_r * 2))
+
+        # 核心圆点
+        p.setBrush(QBrush(core_color))
+        p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+
+        # 高光
+        hl_r = r * 0.35
+        hl_off = r * 0.25
+        p.setBrush(QBrush(QColor(255, 255, 255, 200)))
+        p.drawEllipse(QRectF(cx - hl_off - hl_r, cy - hl_off - hl_r,
+                              hl_r * 2, hl_r * 2))
 
     # ------------------------------------------------------------------ #
     #  绘制单只眼睛（眼白 + 虹膜 + 瞳孔 + 眨眼时的眼睑覆盖）

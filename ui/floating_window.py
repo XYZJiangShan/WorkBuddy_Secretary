@@ -258,8 +258,12 @@ class FloatingWindow(QWidget):
         self._icon_btns = [self._stats_btn, self._history_btn,
                            self._weekly_btn, self._settings_btn]
 
+        # AI 状态指示灯
+        self._ai_led = AIStatusLed(bar)
+
         for btn in self._icon_btns:
             row.addWidget(btn)
+        row.addWidget(self._ai_led)
         row.addWidget(self._close_btn)
 
         return bar
@@ -329,6 +333,13 @@ class FloatingWindow(QWidget):
         # 同步 AI 模式到任务列表
         ai_enabled = self._settings.get_bool("ai_enabled", True)
         self._task_list.set_ai_mode(ai_enabled)
+
+    def set_ai_status(self, busy: bool) -> None:
+        """设置 AI 运行状态指示灯（True=执行中/红色，False=空闲/绿色）"""
+        if hasattr(self, "_ai_led"):
+            self._ai_led.set_busy(busy)
+        if hasattr(self, "_mini_bar"):
+            self._mini_bar.set_ai_status(busy)
 
     # ------------------------------------------------------------------ #
     #  统计面板切换
@@ -1091,4 +1102,75 @@ class _ProgressBarInner(QWidget):
                 grad.setColorAt(1, self._accent2)
             p.setBrush(QBrush(grad))
             p.drawRoundedRect(0, 0, filled_w, h, h // 2, h // 2)
+        p.end()
+
+
+# --------------------------------------------------------------------------- #
+#  AI 状态指示灯（标题栏小圆点：绿色=空闲，红色=AI执行中）
+# --------------------------------------------------------------------------- #
+
+class AIStatusLed(QWidget):
+    """标题栏 AI 状态指示灯，带发光效果的小圆点"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._busy = False
+        self.setFixedSize(QSize(14, 14))
+        self.setToolTip("AI 空闲")
+        self.setStyleSheet("background: transparent;")
+
+    def set_busy(self, busy: bool) -> None:
+        """设置状态：True=执行中(红), False=空闲(绿)"""
+        if self._busy != busy:
+            self._busy = busy
+            self.setToolTip("AI 执行中..." if busy else "AI 空闲")
+            self.update()
+
+    def paintEvent(self, event) -> None:
+        from PyQt6.QtGui import QRadialGradient
+        from PyQt6.QtCore import QRectF
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        cx, cy = self.width() / 2.0, self.height() / 2.0
+        r = 3.0  # 核心半径
+
+        if self._busy:
+            core_color = QColor(255, 80, 80)
+            glow_color = QColor(255, 60, 60, 140)
+            outer_color = QColor(255, 40, 40, 40)
+        else:
+            core_color = QColor(80, 220, 120)
+            glow_color = QColor(60, 200, 100, 140)
+            outer_color = QColor(40, 180, 80, 40)
+
+        # 外层光晕
+        glow_r = r * 2.8
+        glow_grad = QRadialGradient(cx, cy, glow_r)
+        glow_grad.setColorAt(0.0, outer_color)
+        glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(glow_grad))
+        p.drawEllipse(QRectF(cx - glow_r, cy - glow_r, glow_r * 2, glow_r * 2))
+
+        # 内层发光
+        inner_r = r * 1.6
+        inner_grad = QRadialGradient(cx, cy, inner_r)
+        inner_grad.setColorAt(0.0, glow_color)
+        inner_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setBrush(QBrush(inner_grad))
+        p.drawEllipse(QRectF(cx - inner_r, cy - inner_r, inner_r * 2, inner_r * 2))
+
+        # 核心圆点
+        p.setBrush(QBrush(core_color))
+        p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+
+        # 高光
+        hl_r = r * 0.35
+        hl_off = r * 0.3
+        p.setBrush(QBrush(QColor(255, 255, 255, 200)))
+        p.drawEllipse(QRectF(cx - hl_off - hl_r, cy - hl_off - hl_r,
+                              hl_r * 2, hl_r * 2))
+
         p.end()
