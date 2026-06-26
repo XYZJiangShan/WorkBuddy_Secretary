@@ -1,20 +1,11 @@
 {
-  "exported_at": "2026-06-23T21:50:10",
+  "exported_at": "2026-06-26T10:42:03",
   "stats": {
     "total": 0,
     "done": 0,
     "undone": 0
   },
   "today": [
-    {
-      "id": 58,
-      "title": "资产检查工具视频去中文",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-06-17 12:40:57",
-      "done_at": null
-    },
     {
       "id": 57,
       "title": "【企微文档】【STH】 OKR、季度S&T会议组织安排\nhttps://doc.weixin.qq.com/sheet/e3_AQAALgaEACYCNjKsC0121SLWlsR2r?scode=AJEAIQdfAAoEyp2ZDtAOcAxwbdAFw&tab=cz4nnc\n2026 Q2 Show&Tell成果展示开始收集，给大家两周准备时间@所有人",
@@ -43,48 +34,12 @@
       "done_at": null
     },
     {
-      "id": 47,
-      "title": "技术分享会准备，28号给windy 看",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-05-21 10:48:46",
-      "done_at": null
-    },
-    {
       "id": 42,
       "title": "UI资产后缀改名",
       "priority": "high",
       "due_time": null,
       "done": false,
       "created_at": "2026-05-19 12:33:30",
-      "done_at": null
-    },
-    {
-      "id": 36,
-      "title": "买手机，给发票提交，入库",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-05-14 14:52:11",
-      "done_at": null
-    },
-    {
-      "id": 34,
-      "title": "重新导入场景碰撞",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-05-12 15:02:12",
-      "done_at": null
-    },
-    {
-      "id": 32,
-      "title": "对接iwiki内容",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-05-12 12:10:29",
       "done_at": null
     },
     {
@@ -176,6 +131,51 @@
       "done": false,
       "created_at": "2026-04-08 15:36:28",
       "done_at": null
+    },
+    {
+      "id": 58,
+      "title": "资产检查工具视频去中文",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-06-17 12:40:57",
+      "done_at": "2026-06-26 10:12:50"
+    },
+    {
+      "id": 47,
+      "title": "技术分享会准备，28号给windy 看",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-05-21 10:48:46",
+      "done_at": "2026-06-26 10:12:56"
+    },
+    {
+      "id": 36,
+      "title": "买手机，给发票提交，入库",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-05-14 14:52:11",
+      "done_at": "2026-06-26 10:12:58"
+    },
+    {
+      "id": 34,
+      "title": "重新导入场景碰撞",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-05-12 15:02:12",
+      "done_at": "2026-06-26 10:13:01"
+    },
+    {
+      "id": 32,
+      "title": "对接iwiki内容",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-05-12 12:10:29",
+      "done_at": "2026-06-26 10:13:06"
     }
   ]
 }
