@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-06-26T16:06:07",
+  "exported_at": "2026-06-26T17:08:10",
   "stats": {
-    "total": 1,
+    "total": 2,
     "done": 0,
-    "undone": 1
+    "undone": 2
   },
   "today": [
     {
@@ -49,6 +49,15 @@
       "due_time": null,
       "done": false,
       "created_at": "2026-04-02 12:33:05",
+      "done_at": null
+    },
+    {
+      "id": 60,
+      "title": "NPC批量制作LOD",
+      "priority": "medium",
+      "due_time": null,
+      "done": false,
+      "created_at": "2026-06-26 16:38:26",
       "done_at": null
     },
     {
