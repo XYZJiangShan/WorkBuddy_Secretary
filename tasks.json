@@ -1,20 +1,11 @@
 {
-  "exported_at": "2026-06-30T14:38:10",
+  "exported_at": "2026-06-30T15:18:25",
   "stats": {
     "total": 0,
     "done": 0,
     "undone": 0
   },
   "today": [
-    {
-      "id": 57,
-      "title": "【企微文档】【STH】 OKR、季度S&T会议组织安排\nhttps://doc.weixin.qq.com/sheet/e3_AQAALgaEACYCNjKsC0121SLWlsR2r?scode=AJEAIQdfAAoEyp2ZDtAOcAxwbdAFw&tab=cz4nnc\n2026 Q2 Show&Tell成果展示开始收集，给大家两周准备时间@所有人",
-      "priority": "high",
-      "due_time": null,
-      "done": false,
-      "created_at": "2026-06-12 10:57:18",
-      "done_at": null
-    },
     {
       "id": 56,
       "title": "骨骼自动优化工具",
@@ -149,6 +140,15 @@
       "done": false,
       "created_at": "2026-04-08 15:36:28",
       "done_at": null
+    },
+    {
+      "id": 57,
+      "title": "【企微文档】【STH】 OKR、季度S&T会议组织安排\nhttps://doc.weixin.qq.com/sheet/e3_AQAALgaEACYCNjKsC0121SLWlsR2r?scode=AJEAIQdfAAoEyp2ZDtAOcAxwbdAFw&tab=cz4nnc\n2026 Q2 Show&Tell成果展示开始收集，给大家两周准备时间@所有人",
+      "priority": "high",
+      "due_time": null,
+      "done": true,
+      "created_at": "2026-06-12 10:57:18",
+      "done_at": "2026-06-30 14:49:06"
     }
   ]
 }
