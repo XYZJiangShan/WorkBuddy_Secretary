@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-07-01T23:48:26",
+  "exported_at": "2026-07-02T00:18:26",
   "stats": {
-    "total": 2,
-    "done": 1,
-    "undone": 1
+    "total": 0,
+    "done": 0,
+    "undone": 0
   },
   "today": [
     {
@@ -149,15 +149,6 @@
       "done": false,
       "created_at": "2026-04-08 15:36:28",
       "done_at": null
-    },
-    {
-      "id": 61,
-      "title": "给基超bug单教程",
-      "priority": "high",
-      "due_time": null,
-      "done": true,
-      "created_at": "2026-07-01 12:28:17",
-      "done_at": "2026-07-01 15:46:42"
     }
   ]
 }
